@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -54,7 +55,19 @@ def main(argv: list[str] | None = None) -> int:
     prep.add_argument("--small-n", type=int, default=300, help="accounts in the small sample")
     prep.add_argument("--seed", type=int, default=0)
 
+    run = sub.add_parser("run", help="run an experiment config on the validation period")
+    run.add_argument("config", type=Path)
+    run.add_argument("--part", default="valid", help="valid (test needs the lock, Day 9)")
+
     args = parser.parse_args(argv)
+    if args.command == "run":
+        from tells.config import load_config
+        from tells.harness import run_experiment
+
+        result = run_experiment(load_config(args.config), part=args.part)
+        print(json.dumps(result.summary, indent=2))
+        print(f"saved to {result.run_dir}")
+        return 0
     if args.version:
         print(f"tells {tells.__version__}, cleanroom {cleanroom.__version__}")
         return 0
