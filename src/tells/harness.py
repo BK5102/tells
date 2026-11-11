@@ -68,7 +68,7 @@ def run_experiment(
         cases = build_cases(scored, score_col="score")
         cases.write_parquet(run_dir / f"cases_{contestant.name}.parquet")
         contestants[contestant.name] = {
-            "transactions": transaction_metrics(scored),
+            "transactions": transaction_metrics(scored, contestant.outputs_probability),
             "cases": case_metrics(cases, cfg.budgets),
         }
 

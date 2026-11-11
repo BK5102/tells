@@ -23,3 +23,13 @@ def test_case_metrics_use_daily_budget_and_first_day_flag() -> None:
     assert b["precision"] == pytest.approx(0.5)
     assert b["first_day_recall"] == pytest.approx(1.0)
     assert m["n_positive_cases"] == 2
+
+
+def test_calibration_only_for_probability_scores() -> None:
+    from tells.evaluate import transaction_metrics
+
+    scored = pl.DataFrame({"score": [0.9, 0.1, 0.2, 0.8], "label": [1, 0, 0, 1]})
+    assert "calibration" not in transaction_metrics(scored, outputs_probability=False)
+    cal = transaction_metrics(scored, outputs_probability=True)["calibration"]
+    assert cal["brier"] == pytest.approx((0.01 + 0.01 + 0.04 + 0.04) / 4)
+    assert cal["brier_of_base_rate"] == pytest.approx(0.25)
