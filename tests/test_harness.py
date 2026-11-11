@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import polars as pl
@@ -46,7 +46,9 @@ def test_split_hides_test_labels(tmp_path: Path) -> None:
 
 
 def test_run_writes_results_and_cases(tmp_path: Path) -> None:
-    result = run_experiment(_config(tmp_path), part="valid", runs_dir=tmp_path / "runs")
+    result = run_experiment(
+        _config(tmp_path), part="valid", runs_dir=tmp_path / "runs", cache_dir=tmp_path / "cache"
+    )
     saved = json.loads((result.run_dir / "results.json").read_text(encoding="utf-8"))
     a = saved["contestants"]["A_lazy_amount"]
     assert a["transactions"]["n_transactions"] == 4
@@ -55,3 +57,36 @@ def test_run_writes_results_and_cases(tmp_path: Path) -> None:
     cases = pl.read_parquet(result.run_dir / "cases_A_lazy_amount.parquet")
     assert cases.height == 3
     assert "score" in cases.columns
+
+
+def test_lgbm_run_records_provenance_index_and_cache(tmp_path: Path, synthetic_tx) -> None:
+    data = tmp_path / "synthetic.parquet"
+    synthetic_tx.write_parquet(data)
+    cfg = ExperimentConfig(
+        name="syn",
+        dataset="synthetic",
+        data=data,
+        split=Split(
+            train=Window(None, datetime(2015, 1, 1)),
+            valid=Window(datetime(2015, 2, 1), datetime(2015, 8, 1)),
+            test=Window(datetime(2015, 9, 1), datetime(2016, 1, 1)),
+        ),
+        contestants=("lazy_amount", "lgbm_checklist"),
+        model={"lgbm_checklist": {"n_estimators": 30, "min_child_samples": 5}},
+        raw={"name": "syn", "train_end": date(2015, 1, 1)},  # YAML gives dates
+    )
+    runs, cache = tmp_path / "runs", tmp_path / "cache"
+    first = run_experiment(cfg, runs_dir=runs, cache_dir=cache)
+    prov = first.summary["provenance"]
+    assert len(prov["config_hash"]) == 64
+    assert len(prov["data"]["transactions"]["sha256"]) == 64
+    b = first.summary["contestants"]["B_checklist_lgbm"]
+    assert b["model"]["library"] == "lightgbm"
+    assert "calibration" in b["transactions"]
+    assert len(list(cache.glob("checklist_*.parquet"))) == 1
+
+    run_experiment(cfg, runs_dir=runs, cache_dir=cache)  # reuses the cache
+    assert len(list(cache.glob("checklist_*.parquet"))) == 1
+    lines = (runs / "index.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    assert set(json.loads(lines[0])["recall_at_1pct"]) == {"A_lazy_amount", "B_checklist_lgbm"}

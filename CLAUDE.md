@@ -63,7 +63,8 @@ uv run --with polars python scripts/check_data_fit.py tabformer data/raw/tabform
 uv run tells prepare tabformer             # raw CSV -> data/interim/*.parquet (full + 300-card sample)
 uv run pytest -q -m data                  # tests that need the prepared data (skipped in CI)
 uv run ruff check . && uv run ruff format --check .
-uv run tells run configs/small.yaml       # small-subset experiment, CPU, under 15 minutes
+uv run tells run configs/small.yaml       # 300-card experiment on the validation period, about 30 s
+uv run tells run configs/tabformer.yaml   # full TabFormer, validation period (test is locked until Day 9)
 uv run tells agent "does a longer history window help?"
 ```
 

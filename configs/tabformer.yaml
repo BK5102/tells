@@ -12,3 +12,6 @@ split:
   valid: {start: 2016-01-01, end: 2017-01-01}
   # Ends before 2020, which has no fraud in this file.
   test: {start: 2017-04-01, end: 2020-01-01}
+
+contestants: [lazy_amount, lgbm_checklist]
+budgets: [0.005, 0.01, 0.02, 0.05]
