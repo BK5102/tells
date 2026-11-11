@@ -11,7 +11,7 @@ The Cleanroom is written once, as its own installable Python package inside the 
 How siblings install it (after the `cleanroom-v0.1` tag exists):
 
 ```
-uv add "cleanroom @ git+https://github.com/<owner>/tells@cleanroom-v0.1#subdirectory=packages/cleanroom"
+uv add "cleanroom @ git+https://github.com/BK5102/tells@cleanroom-v0.1#subdirectory=packages/cleanroom"
 ```
 
 Rules that follow from this: the Cleanroom contains no fraud, credit, or payments words; any change is released as a new tag (`cleanroom-v0.2`, ...); siblings upgrade on purpose, never automatically. If the Cleanroom later outgrows the Tells repo, it can move to its own repo with no change to the import name.
