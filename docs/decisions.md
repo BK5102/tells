@@ -43,3 +43,7 @@ The original plan built the leak canary on Day 18 and had no day for multiple-co
 ## Day 1 (2026-11-10): repo scaffold
 
 The repo is a uv workspace with two packages: `tells` at the root and `cleanroom` in `packages/cleanroom`, each with its own `pyproject.toml`, tested together by one `pytest` run and by GitHub Actions on Python 3.11 and 3.12. A test fails the build if the Cleanroom ever imports from `tells` or mentions fraud, cards, loans, or payments, so the "domain-neutral" rule is enforced by code, not by memory. Analogy: two apartments in one building, sharing the front door but each with its own lock and lease.
+
+## Day 2 (2026-11-10): TabFormer loader, small sample, account-day cases
+
+The TabFormer loader turns the raw CSV into the standard schema (one row per transaction, each card's history sorted oldest to newest, the raw row number kept as `tx_id`), and `uv run tells prepare tabformer` saves it as Parquet plus a 300-card sample in 26 seconds; a test confirms the full file matches the counts measured independently in `docs/data-fit.md` (24,386,900 transactions, 6,139 cards, 29,757 frauds). The sample picks cards by hashing their ids with a seed, so it is identical on every machine and a bigger sample always contains the smaller one, and `build_cases` groups transactions into account-day cases with a flag for each card's first fraud day. Analogy: the loader is a clerk who files every receipt into the right customer's folder in date order, and the case builder is the daily stack of folders an investigator could open.

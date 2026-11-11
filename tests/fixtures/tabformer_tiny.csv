@@ -1,0 +1,8 @@
+User,Card,Year,Month,Day,Time,Amount,Use Chip,Merchant Name,Merchant City,Merchant State,Zip,MCC,Errors?,Is Fraud?
+0,0,2002,9,1,06:42,$38.48,Swipe Transaction,-727612092139916043,Monterey Park,CA,91754.0,5411,,No
+0,0,2002,9,1,06:21,$134.09,Swipe Transaction,3527213246127876953,La Verne,CA,91750.0,5300,,No
+0,0,2002,9,2,23:59,$-77.00,Chip Transaction,123,La Verne,CA,91750.0,5411,"Bad PIN,",No
+0,1,2002,9,2,10:00,$5.00,Online Transaction,999,ONLINE,,,5311,,Yes
+0,1,2002,9,2,11:00,$6.00,Online Transaction,999,ONLINE,,,5311,,Yes
+0,1,2002,9,3,09:00,$7.00,Online Transaction,999,ONLINE,,,5311,,Yes
+1,0,2003,1,1,00:00,$1.00,Swipe Transaction,5,Mesa,AZ,85201.0,5812,"Insufficient Balance,",No

@@ -42,7 +42,7 @@ tells/
   scripts/       check_data_fit.py and download scripts
   configs/       experiment YAML files
   docs/          tsfm-notes.md  decisions.md  data-fit.md
-  data/          gitignored except README.md and checksums.sha256
+  data/          gitignored except README.md and checksums.sha256 (raw/ downloads, interim/ Parquet)
   artifacts/     gitignored except small sample outputs
 ```
 
@@ -60,6 +60,8 @@ The review budget applies to account-day cases (one case per account per active 
 uv sync --all-packages                    # install tells and cleanroom
 uv run pytest -q                          # tests for tells and cleanroom
 uv run --with polars python scripts/check_data_fit.py tabformer data/raw/tabformer/card_transaction.v1.csv
+uv run tells prepare tabformer             # raw CSV -> data/interim/*.parquet (full + 300-card sample)
+uv run pytest -q -m data                  # tests that need the prepared data (skipped in CI)
 uv run ruff check . && uv run ruff format --check .
 uv run tells run configs/small.yaml       # small-subset experiment, CPU, under 15 minutes
 uv run tells agent "does a longer history window help?"
