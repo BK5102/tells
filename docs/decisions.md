@@ -39,3 +39,7 @@ The owner has no physical GPU. Options for the full grid, in order: ASU Research
 ### D5. Cleanroom v0.1 includes the canary and multiple-comparison correction
 
 The original plan built the leak canary on Day 18 and had no day for multiple-comparison correction, but START_HERE promises the canary in the Cleanroom and Reserve requires the correction. Both now ship in Days 10 and 11, before the Cleanroom tag, and Day 18 only wires them into Tells experiments. Analogy: the smoke detector is installed when the house is built, not after the first dinner party.
+
+## Day 1 (2026-11-10): repo scaffold
+
+The repo is a uv workspace with two packages: `tells` at the root and `cleanroom` in `packages/cleanroom`, each with its own `pyproject.toml`, tested together by one `pytest` run and by GitHub Actions on Python 3.11 and 3.12. A test fails the build if the Cleanroom ever imports from `tells` or mentions fraud, cards, loans, or payments, so the "domain-neutral" rule is enforced by code, not by memory. Analogy: two apartments in one building, sharing the front door but each with its own lock and lease.

@@ -143,9 +143,7 @@ def report(lf: pl.LazyFrame) -> None:
     # The key question: how much history exists BEFORE each account's first
     # positive? That is all a past-only model can use to spot the change.
     first_pos = (
-        df.filter(pl.col("label") == 1)
-        .group_by("account")
-        .agg(prior=pl.col("prior_events").min())
+        df.filter(pl.col("label") == 1).group_by("account").agg(prior=pl.col("prior_events").min())
     )
     if first_pos.height:
         fq = first_pos["prior"].quantile
@@ -164,9 +162,7 @@ def report(lf: pl.LazyFrame) -> None:
         # Label propagation check: once an account has a positive, how often
         # are its LATER events also positive? Near 100% means labels were
         # copied forward, which makes "had fraud before" an easy shortcut.
-        after = df.join(first_pos, on="account").filter(
-            pl.col("prior_events") > pl.col("prior")
-        )
+        after = df.join(first_pos, on="account").filter(pl.col("prior_events") > pl.col("prior"))
         if after.height:
             print(
                 f"events after an account's first positive: {after.height:,}, "
@@ -185,9 +181,7 @@ def report(lf: pl.LazyFrame) -> None:
     # Are positives spread across time (needed for a time split)?
     by_period = (
         df.group_by(
-            pl.col("ts")
-            .dt.truncate("1y" if (t1 - t0).days > 730 else "1d")
-            .alias("period")
+            pl.col("ts").dt.truncate("1y" if (t1 - t0).days > 730 else "1d").alias("period")
         )
         .agg(events=pl.len(), positives=pl.col("label").sum())
         .sort("period")
