@@ -1,0 +1,25 @@
+# Raw data is never committed. Only data/README.md and data/checksums.sha256 are tracked.
+data/raw/
+artifacts/
+!artifacts/samples/
+
+# Secrets
+.env
+.env.*
+
+# Python and tooling
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

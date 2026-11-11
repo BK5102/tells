@@ -1,0 +1,39 @@
+flowchart LR
+    subgraph P1["STEP 1: THE BASICS"]
+        direction TB
+        A["<b>PAYMENT FRAUD</b><br/>Someone uses a card or account that is not theirs<br/><i>Like: a forged signature on a cheque</i>"]
+        B["<b>FRAUD IS RARE</b><br/>A tiny share of all transactions<br/><i>Like: a few fake bills in a till full of real ones</i>"]
+        C["<b>WHY 'ACCURACY' LIES</b><br/>Saying 'everything is fine' is right almost every time<br/><i>Like: a guard who never stops anyone and is<br/>'correct' 999 times out of 1000</i>"]
+        D["<b>REVIEW BUDGET</b><br/>Human analysts can only look at N cases per day<br/><i>Like: airport security can only pat down<br/>a few passengers per hundred</i>"]
+        E["<b>THE REAL GOAL</b><br/>Put the true fraud inside the top N of the risk list<br/>Metric: recall at top-N = share of all fraud caught<br/>within the review budget"]
+        A --> B
+        B --> C
+        C --> D
+        D --> E
+    end
+    subgraph P2["STEP 2: TODAY AND THE GAP"]
+        direction TB
+        F["<b>TODAY'S TOOLKIT</b><br/>Hand-made red-flag features (purchases in the last 24h,<br/>average amount) fed to a tree model such as XGBoost<br/><i>Like: a checklist of known warning signs</i>"]
+        G["<b>THE GAP</b><br/>A checklist squeezes history into a few counts and<br/>loses rhythm and order<br/><i>Like: knowing someone bought 6 gift cards, but not that it<br/>was at 3am after months of only groceries</i>"]
+        F --> G
+    end
+    subgraph P3["STEP 3: THE IDEA AND THE EXAM"]
+        direction TB
+        H["<b>THE IDEA</b><br/>An account's history IS a time series. A TSFM reads it and gives:<br/>(a) an embedding = a fingerprint of this person's normal behavior<br/>(b) a surprise score = how unusual is the newest event for them?<br/><i>Like: a bank teller who knows your habits and notices the change</i>"]
+        I["<b>PLUG IT IN</b><br/>Add fingerprint + surprise as extra columns next to<br/>the old features. Keep the tree model."]
+        J["<b>HONEST EXAM</b><br/>Train on earlier months, test on later months,<br/>same review budget for every contestant<br/><i>Like: study last term, sit this term's exam</i>"]
+        K["<b>WHAT YOU REPORT</b><br/>Did it catch more fraud at the same budget?<br/>Is it still well calibrated? How much slower and costlier?<br/>Can a human understand why it flagged an account?"]
+        H --> I
+        I --> J
+        J --> K
+    end
+    P1 --> P2
+    P2 --> P3
+    classDef concept fill:#e8f1ff,stroke:#2b6cb0,color:#102a43;
+    classDef warn fill:#ffe8e8,stroke:#c53030,color:#4a1010;
+    classDef idea fill:#fff4d6,stroke:#b7791f,color:#4a3200;
+    classDef good fill:#e6f7ec,stroke:#2f855a,color:#0f3d24;
+    class A,B,D,E,F concept;
+    class C,G warn;
+    class H,I idea;
+    class J,K good;

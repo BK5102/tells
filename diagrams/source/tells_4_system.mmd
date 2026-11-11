@@ -1,0 +1,63 @@
+flowchart TD
+    subgraph S1["1. DATA (public or synthetic only, never real customers)"]
+        A["Transactions<br/>who, when, how much, where"]
+        B["Per-account history<br/>sorted oldest to newest"]
+    end
+    subgraph S2["2. FEATURES (past-only, tested for leaks)"]
+        C["Red-flag features<br/>counts and averages<br/><i>the checklist</i>"]
+        D["TSFM embedding<br/>fingerprint of the history<br/><i>the doctor's notes</i>"]
+        E["Surprise score<br/>forecast of next event vs what happened<br/><i>the raised eyebrow</i>"]
+    end
+    subgraph S3["3. CONTESTANTS"]
+        F["A. Lazy baseline<br/>rank by simple rule"]
+        G["B. Checklist + tree model<br/>what banks do today"]
+        H["C. TSFM only"]
+        I["D. Checklist + embedding + surprise<br/>+ tree model"]
+    end
+    subgraph S4["4. THE CLEANROOM (honest exam)"]
+        J["Time split + gap<br/>+ sealed envelope lock"]
+        K["Scores: recall at review budget,<br/>PR-AUC, calibration, speed, cost"]
+        L["Luck check:<br/>paired bootstrap intervals"]
+        M["Canary test:<br/>a deliberately leaky feature<br/>must be caught"]
+    end
+    subgraph S5["5. AGENT HARNESS (the lab bench and rulebook)"]
+        N["Planner<br/>turns a question into an experiment list"]
+        O["Runner<br/>runs experiments using approved tools only"]
+        P["Critic<br/>checks split order, lock, canary, interval width"]
+        Q["Reporter<br/>code inserts the numbers,<br/>the LLM writes the plain-English story"]
+    end
+    R["YOU<br/>review the report, caveats, and what was NOT tested"]
+
+    A --> B
+    B --> C
+    B --> D
+    B --> E
+    C --> G
+    C --> I
+    D --> H
+    D --> I
+    E --> I
+    A --> F
+    F --> J
+    G --> J
+    H --> J
+    I --> J
+    J --> K --> L
+    M --> L
+    N --> O --> P --> Q --> R
+    O -. runs .-> J
+    P -. verifies .-> M
+    L --> Q
+
+    classDef data fill:#eef2f7,stroke:#4a5568,color:#1a202c;
+    classDef feat fill:#e8f1ff,stroke:#2b6cb0,color:#102a43;
+    classDef cont fill:#f3e8ff,stroke:#6b46c1,color:#2d1b4e;
+    classDef room fill:#fff4d6,stroke:#b7791f,color:#4a3200;
+    classDef agent fill:#e6f7ec,stroke:#2f855a,color:#0f3d24;
+    classDef human fill:#ffe8e8,stroke:#c53030,color:#4a1010;
+    class A,B data;
+    class C,D,E feat;
+    class F,G,H,I cont;
+    class J,K,L,M room;
+    class N,O,P,Q agent;
+    class R human;
