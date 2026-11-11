@@ -365,9 +365,9 @@ Fraud teams review a limited number of cases and already use gradient-boosted mo
 |---|---|---|
 | Primary | IBM TabFormer synthetic credit card transactions (GitHub, free, no account) | 6,139 cards, 1991 to 2020, median 1,493 transactions before a card's first fraud. Real account histories to read. |
 | Second | AMLWorld HI-Small (Kaggle, free account) | The benchmark the TSFM paper used, so results can be compared. Thin history: median 9 prior events. Truncate to 2022-09-01 through 2022-09-10; after that the data is about 60% laundering, a generator artifact. |
-| Optional dev set | Sparkov credit card simulation (Kaggle, free account) | About 1,000 cards over two years (reported, not measured). Small and fast. |
-| Not used | IEEE-CIS Fraud Detection (Kaggle, free account, accept rules) | Real but anonymized, but measured: the median rebuilt account appears once and has 0 transactions before its first fraud, and 66% of later transactions on a fraud account are also labeled fraud (labels copied forward). |
-| Dropped | PaySim | 99.9% of accounts appear exactly once, so there is no history to read. |
+| Set aside | IEEE-CIS, PaySim, Sparkov | IEEE-CIS and PaySim have no usable account histories (measured); Sparkov is another card simulator, so it adds little variety. Details in `docs/data-fit.md`. |
+
+Why this pair: both are free, and they differ on every axis that matters for the question. TabFormer is card fraud with decades of history per card; AMLWorld is money laundering with days of history per account and a published TSFM result to compare against. If the TSFM helps on one and not the other, history length is the first explanation to test.
 
 Never commit raw data to git. Store download scripts and checksums instead. Run `scripts/check_data_fit.py` on any new dataset before writing a loader for it.
 

@@ -10,7 +10,7 @@ Numbers below come from `scripts/check_data_fit.py` unless marked "reported". "P
 |---|---|---|---|---|---|---|---|
 | IBM TabFormer credit card | Free, no account (GitHub LFS) | Yes | 6,139 cards, 2,000 users | 1991 to 2020 | 0.122% of transactions | 1,493 | **Primary.** Fits the idea best. |
 | AMLWorld HI-Small | Free Kaggle account | Yes (Hugging Face mirror, row count matches the paper) | 515,088 | 10 usable days | 0.102% of transactions | 9 | **Second dataset.** Thin history, but it is the benchmark the TSFM paper used. |
-| Sparkov (Kaggle "fraud-detection") | Free Kaggle account | No. The only public mirror found was truncated at 1,048,576 rows with rounded card numbers, so it was discarded | about 1,000 cards (reported) | 2019 to 2020 (reported) | not measured | not measured | **Optional fast dev set.** Likely fits; verify. |
+| Sparkov (Kaggle "fraud-detection") | Free Kaggle account | No. The only public mirror found was truncated at 1,048,576 rows with rounded card numbers, so it was discarded | about 1,000 cards (reported) | 2019 to 2020 (reported) | not measured | not measured | **Set aside.** Likely fits, but a second card simulator adds little variety next to TabFormer. |
 | IEEE-CIS Fraud Detection | Free Kaggle account, accept competition rules | Yes (Hugging Face mirror, 590,540 rows, matching the official count) | 199,070 reconstructed ids | 181 days | 3.5% of transactions | 0 | **Not recommended for Tells.** No usable account histories, and labels are copied forward. |
 | PaySim | Free Kaggle account | Yes (Hugging Face mirror, 6,362,620 rows) | 6,353,307 | 30 days | 0.129% | 0 | **Dropped.** 99.9% of accounts appear exactly once. |
 

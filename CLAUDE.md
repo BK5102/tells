@@ -50,7 +50,7 @@ The Cleanroom (`packages/cleanroom`, imported as `cleanroom`) is shared with the
 
 ## Data and scoring unit
 
-Measured fit for every candidate dataset is in `docs/data-fit.md`. Primary dataset: IBM TabFormer credit card transactions. Second: AMLWorld HI-Small, truncated to 2022-09-01 through 2022-09-10, because the data after that is about 60% laundering, a generator artifact. Optional: Sparkov. IEEE-CIS and PaySim are not used (no usable account histories; see the ranking in `docs/data-fit.md`).
+Measured fit for every candidate dataset is in `docs/data-fit.md`. Primary dataset: IBM TabFormer credit card transactions. Second: AMLWorld HI-Small, truncated to 2022-09-01 through 2022-09-10, because the data after that is about 60% laundering, a generator artifact. No other datasets are used. Sparkov, IEEE-CIS, and PaySim were evaluated and set aside (see the ranking in `docs/data-fit.md`); do not add loaders for them.
 
 The review budget applies to account-day cases (one case per account per active day; score is the max transaction score that day; label is 1 if any transaction that day is positive), as a share of each day's cases. Transaction-level PR-AUC is reported as a secondary number. See `docs/decisions.md` D3.
 
