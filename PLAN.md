@@ -419,7 +419,7 @@ Each row should end in a merged commit with a test. If a day slips, drop the nex
 
 ### Phase 0 (done 2026-11-10): decisions and data fit
 
-Decisions D1 to D5 in `docs/decisions.md`; measured dataset fit in `docs/data-fit.md`; `scripts/check_data_fit.py`.
+Decisions D1 to D5 in `docs/decisions.md`; measured dataset fit in `docs/data-fit.md`; `scripts/check_data_fit.py`; repo at https://github.com/BK5102/tells. Owner actions still to do before they are needed: a free Kaggle account for the official AMLWorld download (Day 27) and an Anthropic API key in `.env` (Day 22).
 
 ### Days 1 to 11: build the Cleanroom (the shared package)
 

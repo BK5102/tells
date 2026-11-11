@@ -1,0 +1,14 @@
+# TabFormer experiment config. The split below is proposed on Day 3 and becomes
+# binding when the sealed-envelope lock is added on Day 9. Do not change it
+# after seeing test results; see docs/decisions.md Day 3.
+dataset: tabformer
+data: data/interim/tabformer.parquet
+
+split:
+  # 90 days between windows, an assumption standing in for the delay before
+  # fraud labels are known (not sourced to a specific network rule).
+  min_gap_days: 90
+  train: {start: null, end: 2015-10-01}
+  valid: {start: 2016-01-01, end: 2017-01-01}
+  # Ends before 2020, which has no fraud in this file.
+  test: {start: 2017-04-01, end: 2020-01-01}
