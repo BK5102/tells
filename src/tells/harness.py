@@ -19,6 +19,7 @@ from tells.cases import build_cases
 from tells.config import ExperimentConfig
 from tells.data.schema import validate_transactions
 from tells.evaluate import case_metrics, transaction_metrics
+from tells.features.checklist import build_checklist_features
 from tells.models.contestants import make_contestant
 
 RUNS_DIR = Path("artifacts/runs")
@@ -53,6 +54,10 @@ def run_experiment(
 
     tx = pl.read_parquet(cfg.data)
     validate_transactions(tx)
+    # Features are built on the full history before splitting, so evaluated
+    # rows can use their own past. They are past-only (tested), and labels are
+    # dropped inside the builder.
+    tx = tx.join(build_checklist_features(tx), on="tx_id", how="left", maintain_order="left")
     parts = split_data(cfg, tx)
     eval_rows = parts[part]
 
