@@ -18,6 +18,7 @@ import polars as pl
 from tells.cases import build_cases
 from tells.config import ExperimentConfig
 from tells.data.schema import validate_transactions
+from tells.evaluate import case_metrics, transaction_metrics
 from tells.models.contestants import make_contestant
 
 RUNS_DIR = Path("artifacts/runs")
@@ -67,9 +68,8 @@ def run_experiment(
         cases = build_cases(scored, score_col="score")
         cases.write_parquet(run_dir / f"cases_{contestant.name}.parquet")
         contestants[contestant.name] = {
-            "n_transactions": scored.height,
-            "n_cases": cases.height,
-            "n_positive_cases": int(cases["label"].sum()),
+            "transactions": transaction_metrics(scored),
+            "cases": case_metrics(cases, cfg.budgets),
         }
 
     summary = {

@@ -48,7 +48,10 @@ def test_split_hides_test_labels(tmp_path: Path) -> None:
 def test_run_writes_results_and_cases(tmp_path: Path) -> None:
     result = run_experiment(_config(tmp_path), part="valid", runs_dir=tmp_path / "runs")
     saved = json.loads((result.run_dir / "results.json").read_text(encoding="utf-8"))
-    assert saved["contestants"]["A_lazy_amount"]["n_transactions"] == 4
+    a = saved["contestants"]["A_lazy_amount"]
+    assert a["transactions"]["n_transactions"] == 4
+    assert a["cases"]["n_cases"] == 3
+    assert set(a["cases"]["by_budget"]) == {"0.005", "0.01", "0.02", "0.05"}
     cases = pl.read_parquet(result.run_dir / "cases_A_lazy_amount.parquet")
     assert cases.height == 3
     assert "score" in cases.columns
