@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +34,10 @@ RUNS_DIR = Path("artifacts/runs")
 FEATURE_CACHE = Path("data/interim/features")
 EVAL_PARTS = ("valid",)  # "test" joins this list only through the lock
 PACKAGES = ("tells", "cleanroom", "polars", "numpy", "lightgbm")
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 class ScoringLockedError(PermissionError):
@@ -83,7 +88,7 @@ def run_experiment(
     if part not in EVAL_PARTS:
         raise ValueError(f"part must be one of {EVAL_PARTS}, got {part!r}")
 
-    started = datetime.now(UTC)
+    started = _now()
     data_sha = file_sha256(cfg.data)
     provenance = stamp(
         cfg.raw, {"transactions": cfg.data}, PACKAGES, data_checksums={"transactions": data_sha}
@@ -99,7 +104,12 @@ def run_experiment(
     parts = split_data(cfg, tx)
     eval_rows = parts[part]
 
-    run_id = f"{started:%Y%m%dT%H%M%SZ}_{cfg.name}_{part}_{config_hash(cfg.raw)[:8]}"
+    # The random suffix keeps two runs that start in the same second apart.
+    # exist_ok=False below still refuses to overwrite an existing run.
+    run_id = (
+        f"{started:%Y%m%dT%H%M%SZ}_{cfg.name}_{part}_{config_hash(cfg.raw)[:8]}"
+        f"_{uuid.uuid4().hex[:6]}"
+    )
     run_dir = runs_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
 

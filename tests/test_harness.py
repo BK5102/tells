@@ -90,3 +90,18 @@ def test_lgbm_run_records_provenance_index_and_cache(tmp_path: Path, synthetic_t
     lines = (runs / "index.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     assert set(json.loads(lines[0])["recall_at_1pct"]) == {"A_lazy_amount", "B_checklist_lgbm"}
+
+
+def test_two_runs_in_the_same_second_get_separate_folders(tmp_path: Path, monkeypatch) -> None:
+    # Regression: CI runs fast enough that two runs can start in the same
+    # second, and the run folder name used to be second-resolution only.
+    import tells.harness as harness
+
+    frozen = datetime(2026, 1, 1, 12, 0, 0, tzinfo=harness.UTC)
+    monkeypatch.setattr(harness, "_now", lambda: frozen)
+    cfg = _config(tmp_path)
+    runs, cache = tmp_path / "runs", tmp_path / "cache"
+    first = run_experiment(cfg, runs_dir=runs, cache_dir=cache)
+    second = run_experiment(cfg, runs_dir=runs, cache_dir=cache)
+    assert first.run_dir != second.run_dir
+    assert (first.run_dir / "results.json").exists() and (second.run_dir / "results.json").exists()

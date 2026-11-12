@@ -9,6 +9,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      # Report every Python version instead of cancelling the rest on one failure.
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
