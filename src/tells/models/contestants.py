@@ -75,8 +75,13 @@ class LGBMParams:
         return cls(**d)
 
 
+# Text columns given to the tree model as categories: merchant category or
+# payment format, and channel (swipe/chip/online, or sent/received/self).
+CATEGORICAL = ("category", "channel")
+
+
 class ChecklistLightGBM:
-    """Contestant B: checklist features plus merchant category into a LightGBM model.
+    """Contestant B: checklist features plus category and channel into a LightGBM model.
 
     Roughly what banks use today: hand-built red flags and a tree model.
     """
@@ -86,30 +91,31 @@ class ChecklistLightGBM:
 
     def __init__(self, params: LGBMParams | None = None) -> None:
         self.params = params or LGBMParams()
-        self.feature_names = [*FEATURE_COLUMNS, "category_code"]
-        self._categories: dict[str, int] = {}
+        self.feature_names = [*FEATURE_COLUMNS, *(f"{c}_code" for c in CATEGORICAL)]
+        self._categories: dict[str, dict[str, int]] = {}
         self._booster: lgb.Booster | None = None
 
     def _matrix(self, rows: pl.DataFrame) -> np.ndarray:
         # Unknown or rare categories become -1, which LightGBM treats as missing.
-        codes = rows["category"].replace_strict(self._categories, default=-1, return_dtype=pl.Int32)
-        return (
-            rows.select(FEATURE_COLUMNS)
-            .with_columns(category_code=codes)
-            .cast(pl.Float64)
-            .to_numpy()
-        )
+        codes = {
+            f"{c}_code": rows[c].replace_strict(
+                self._categories[c], default=-1, return_dtype=pl.Int32
+            )
+            for c in CATEGORICAL
+        }
+        return rows.select(FEATURE_COLUMNS).with_columns(**codes).cast(pl.Float64).to_numpy()
 
     def fit(self, train: pl.DataFrame) -> None:
         p = self.params
-        counts = train["category"].value_counts()
-        common = counts.filter(pl.col("count") >= p.min_category_count)["category"].sort()
-        self._categories = {c: i for i, c in enumerate(common.to_list())}
+        for c in CATEGORICAL:
+            counts = train[c].value_counts()
+            common = counts.filter(pl.col("count") >= p.min_category_count)[c].sort()
+            self._categories[c] = {v: i for i, v in enumerate(common.to_list())}
         dataset = lgb.Dataset(
             self._matrix(train),
             label=train["label"].to_numpy(),
             feature_name=self.feature_names,
-            categorical_feature=["category_code"],
+            categorical_feature=[f"{c}_code" for c in CATEGORICAL],
             free_raw_data=True,
             params={"verbose": -1},
         )
@@ -141,7 +147,7 @@ class ChecklistLightGBM:
             "library_version": lgb.__version__,
             "params": asdict(self.params),
             "features": self.feature_names,
-            "n_categories": len(self._categories),
+            "n_categories": {c: len(m) for c, m in self._categories.items()},
         }
 
 

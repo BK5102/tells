@@ -50,9 +50,9 @@ The Cleanroom (`packages/cleanroom`, imported as `cleanroom`) is shared with the
 
 ## Data and scoring unit
 
-Measured fit for every candidate dataset is in `docs/data-fit.md`. Primary dataset: IBM TabFormer credit card transactions. Second: AMLWorld HI-Small, truncated to 2022-09-01 through 2022-09-10, because the data after that is about 60% laundering, a generator artifact. No other datasets are used. Sparkov, IEEE-CIS, and PaySim were evaluated and set aside (see the ranking in `docs/data-fit.md`); do not add loaders for them.
+Measured fit for every candidate dataset is in `docs/data-fit.md`. Main test: AMLWorld HI-Small, truncated to 2022-09-01 through 2022-09-10 (the data after that is about 60% laundering, a generator artifact), because the bank-style model is far from perfect there and the published TSFM paper used it. Secondary, long-history test: IBM TabFormer credit card transactions. Reasons: `docs/methodology.md` M4. No other datasets are used. Sparkov, IEEE-CIS, and PaySim were evaluated and set aside (see the ranking in `docs/data-fit.md`); do not add loaders for them.
 
-The review budget applies to account-day cases (one case per account per active day; score is the max transaction score that day; label is 1 if any transaction that day is positive), as a share of each day's cases. Transaction-level PR-AUC is reported as a secondary number. See `docs/decisions.md` D3.
+The review budget applies to account-day cases (one case per account per active day; score is the max transaction score that day; label is 1 if any transaction that day is positive), as a share of each day's cases: 0.1%, 0.5%, 1%, 2%, 5%. **Headline metric: first-fraud-day catch rate at a 0.5% daily budget**, set in every config under `headline:`. All other metrics are always reported next to it. See `docs/methodology.md` M10 to M12.
 
 ## Commands
 
@@ -61,10 +61,13 @@ uv sync --all-packages                    # install tells and cleanroom
 uv run pytest -q                          # tests for tells and cleanroom
 uv run --with polars python scripts/check_data_fit.py tabformer data/raw/tabformer/card_transaction.v1.csv
 uv run tells prepare tabformer             # raw CSV -> data/interim/*.parquet (full + 300-card sample)
+uv run tells prepare amlworld              # raw CSV -> data/interim/*.parquet (full + 20,000-account sample)
 uv run pytest -q -m data                  # tests that need the prepared data (skipped in CI)
 uv run ruff check . && uv run ruff format --check .
 uv run tells run configs/small.yaml       # 300-card experiment on the validation period, about 30 s
 uv run tells run configs/tabformer.yaml   # full TabFormer, validation period (test is locked until Day 9)
+uv run tells run configs/amlworld_small.yaml  # 20,000-account AMLWorld sample, seconds
+uv run tells run configs/amlworld.yaml    # full AMLWorld (the main test), validation period
 uv run tells agent "does a longer history window help?"
 ```
 
@@ -84,6 +87,7 @@ If a command above does not exist yet, create it as part of the day's task and u
 10. **Negative results stay in.** Do not hide runs where the TSFM did not help.
 11. **Correct for many comparisons.** When more than one contestant or variant is compared, apply the Cleanroom's multiple-comparison correction and report how many variants were tried.
 12. **Past labels are not free.** A fraud label is only known after review. Never use an account's earlier labels as a feature unless a realistic label delay is applied and tested.
+13. **Every choice is explained.** Any new method, variable, threshold, default, or dataset choice gets an entry in `docs/methodology.md` (what, why, what else was considered, limitation) in the same commit, and any new limitation goes in its limitations register. The owner must be able to defend every choice in an interview.
 
 ## Agent safety rules (for the agent code in `src/tells/agent/`)
 
@@ -98,7 +102,7 @@ If a command above does not exist yet, create it as part of the day's task and u
 - Commit style: `type: short summary` (for example `feat: add past-only rolling count features`). Use `feat`, `fix`, `test`, `docs`, `chore`.
 - Before finishing a task: run tests and lint, then state what changed and what you did not verify.
 - When a task is ambiguous, ask one specific question instead of guessing.
-- After each feature, add a 3-sentence plain-English note to `docs/decisions.md` explaining what you built and why, with an analogy. These notes become the owner's talking points.
+- After each feature, add a 3-sentence plain-English note to `docs/decisions.md` explaining what you built and why, with an analogy, and add or update the matching `docs/methodology.md` entry. These notes become the owner's talking points.
 
 ## Definition of done for any feature
 

@@ -284,7 +284,7 @@ Fill the brackets only with numbers you actually measured. Never quote a result 
 1. **The problem.** Fraud is rare and review capacity is limited, so accuracy is the wrong score. What matters is how much fraud lands inside the review budget.
 2. **The idea.** Pretrained time series models read an account's history and produce a fingerprint of normal behavior and a surprise score for the latest event. Recent research suggests that adding such summaries helps some financial-crime tasks, but results are not independently validated under strict, budget-aware testing.
 3. **What I built.** (a) The Cleanroom: time-ordered splits, a sealed test plan, a planted-leak canary test, luck checks, and calibration. (b) Four contestants from a lazy baseline to checklist plus embeddings. (c) An agent harness with a planner, runner, critic, and reporter.
-4. **What I found.** "On [dataset] at a [X]% review budget, the checklist model caught [A]% of fraud and adding embeddings caught [B]% (interval [lo, hi]). Calibration was [better/worse]. Embedding cost was [N] ms per account." If the result is negative, say so: "It did not help, and here is the evidence that the test was fair."
+4. **What I found.** "On AMLWorld at a 0.5% daily review budget, the bank-style model caught [A]% of laundering accounts on their first bad day and adding TSFM features caught [B]% (interval [lo, hi]). On long-history card data the difference was [C]. Calibration was [better/worse]. Embedding cost was [N] ms per account." If the result is negative, say so: "It did not help, and here is the evidence that the test was fair."
 5. **What I'd do next.** Try real bank data under an agreement, add more TSFMs, and test how the gain holds up as fraud patterns change over time.
 
 ### Versions for different people
@@ -363,8 +363,8 @@ Fraud teams review a limited number of cases and already use gradient-boosted mo
 
 | Role | Dataset | Why |
 |---|---|---|
-| Primary | IBM TabFormer synthetic credit card transactions (GitHub, free, no account) | 6,139 cards, 1991 to 2020, median 1,493 transactions before a card's first fraud. Real account histories to read. |
-| Second | AMLWorld HI-Small (Kaggle, free account) | The benchmark the TSFM paper used, so results can be compared. Thin history: median 9 prior events. Truncate to 2022-09-01 through 2022-09-10; after that the data is about 60% laundering, a generator artifact. |
+| Secondary (long history) | IBM TabFormer synthetic credit card transactions (GitHub, free, no account) | 6,139 cards, 1991 to 2020, median 1,493 transactions before a card's first fraud. Real account histories to read, but the bank-style model is near the ceiling here. |
+| Main test | AMLWorld HI-Small (Kaggle, free account) | The benchmark the TSFM paper used, so results can be compared. Thin history: median 9 prior events. Truncate to 2022-09-01 through 2022-09-10; after that the data is about 60% laundering, a generator artifact. |
 | Set aside | IEEE-CIS, PaySim, Sparkov | IEEE-CIS and PaySim have no usable account histories (measured); Sparkov is another card simulator, so it adds little variety. Details in `docs/data-fit.md`. |
 
 Why this pair: both are free, and they differ on every axis that matters for the question. TabFormer is card fraud with decades of history per card; AMLWorld is money laundering with days of history per account and a published TSFM result to compare against. If the TSFM helps on one and not the other, history length is the first explanation to test.
@@ -373,7 +373,7 @@ Never commit raw data to git. Store download scripts and checksums instead. Run 
 
 ### Scoring unit
 
-Each account active on a day is one case. A case's score is the highest score among its transactions that day, and its label is 1 if any of them is labeled. The review budget is a share of each day's cases. Transaction-level PR-AUC is also reported for comparison with published AMLWorld results. See `docs/decisions.md` D3.
+Each account active on a day is one case. A case's score is the highest score among its transactions that day, and its label is 1 if any of them is labeled. The review budget is a share of each day's cases (0.1%, 0.5%, 1%, 2%, 5%). The headline metric is the first-fraud-day catch rate at a 0.5% daily budget; every other metric is reported next to it. Transaction-level PR-AUC is also reported for comparison with published AMLWorld results. Reasons for every choice: `docs/methodology.md`.
 
 ### Evaluation protocol
 
@@ -419,7 +419,7 @@ Each row should end in a merged commit with a test. If a day slips, drop the nex
 
 ### Phase 0 (done 2026-11-10): decisions and data fit
 
-Decisions D1 to D5 in `docs/decisions.md`; measured dataset fit in `docs/data-fit.md`; `scripts/check_data_fit.py`; repo at https://github.com/BK5102/tells. Owner actions still to do before they are needed: a free Kaggle account for the official AMLWorld download (Day 27) and an Anthropic API key in `.env` (Day 22).
+Decisions D1 to D5 in `docs/decisions.md`; reasons for every method in `docs/methodology.md`; measured dataset fit in `docs/data-fit.md`; `scripts/check_data_fit.py`; repo at https://github.com/BK5102/tells. Owner actions still to do before they are needed: a free Kaggle account for the official AMLWorld download (Day 27) and an Anthropic API key in `.env` (Day 22).
 
 ### Days 1 to 11: build the Cleanroom (the shared package)
 
@@ -462,8 +462,8 @@ Ablations (context length, embedding size via PCA, frozen only) move into the Da
 | 23 | Critic: deterministic checks, then LLM review. |
 | 24 | Reporter: template inserts numbers from result files, the LLM writes the narrative only. |
 | 25 | Guardrail tests: a peek-at-test-labels attempt must be denied. Record LLM calls as cassettes. |
-| 26 | Run the full experiment grid on TabFormer, including the ablation configs. Store artifacts. Leak audit prompt. |
-| 27 | AMLWorld HI-Small loader (same schema as Day 2, truncated to 2022-09-01 through 2022-09-10) and replication. |
+| 26 | Run the full experiment grid on AMLWorld (the main test), including the ablation configs. Store artifacts. Leak audit prompt. |
+| 27 | Replicate the grid on TabFormer (the long-history case) and compare by history length (M23). |
 | 28 | Write "Findings and limits", including negative results. |
 | 29 | README polish: diagrams, pitch, quickstart, a terminal recording. |
 | 30 | Tag v0.1. Post a short build-in-public write-up (not a paper). Open three "good first issue" tickets. |

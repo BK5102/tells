@@ -1,6 +1,6 @@
 [project]
 name = "cleanroom"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "A domain-neutral toolkit for honest time-ordered model evaluation: splits, sealed-envelope lock, metrics, bootstrap, canary."
 readme = "README.md"
 requires-python = ">=3.11"

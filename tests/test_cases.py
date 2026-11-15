@@ -51,3 +51,11 @@ def test_case_score_is_max_transaction_score(tx: pl.DataFrame) -> None:
 def test_cases_sorted_by_day_then_account(tx: pl.DataFrame) -> None:
     cases = build_cases(tx)
     assert cases.equals(cases.sort("day", "account_id"))
+
+
+def test_accounts_already_known_bad_have_no_first_fraud_day(tx: pl.DataFrame) -> None:
+    # Card 0_1 is positive on 09-02. If it was already positive before the
+    # evaluation window, catching it again is not a new catch.
+    cases = build_cases(tx, known_positive_accounts={"0_1"})
+    assert cases["is_first_positive"].sum() == 0
+    assert cases["label"].sum() == 2  # still positive cases for recall

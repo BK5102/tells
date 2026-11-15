@@ -35,7 +35,26 @@ def test_lazy_amount_ranks_by_amount() -> None:
 
 def test_test_scoring_refused_before_lock(tmp_path: Path) -> None:
     with pytest.raises(ScoringLockedError):
-        run_experiment(_config(tmp_path), part="test", runs_dir=tmp_path / "runs")
+        run_experiment(
+            _config(tmp_path), part="test", runs_dir=tmp_path / "runs", locks_dir=tmp_path / "locks"
+        )
+
+
+def test_test_scoring_after_lock_is_recorded(tmp_path: Path) -> None:
+    from cleanroom.lock import seal
+
+    cfg = _config(tmp_path)
+    cfg = ExperimentConfig(**{**cfg.__dict__, "raw": {"name": "tiny", "v": 1}})
+    lock = seal(cfg.raw, tmp_path / "locks")
+    kw = dict(
+        runs_dir=tmp_path / "runs", cache_dir=tmp_path / "cache", locks_dir=tmp_path / "locks"
+    )
+    first = run_experiment(cfg, part="test", **kw)
+    second = run_experiment(cfg, part="test", **kw)
+    assert first.summary["lock"]["test_run_number"] == 1
+    assert second.summary["lock"]["test_run_number"] == 2
+    assert len(lock.uses()) == 2
+    assert first.summary["positives"]["test"] >= 0  # labels available only after the lock
 
 
 def test_split_hides_test_labels(tmp_path: Path) -> None:
@@ -53,7 +72,8 @@ def test_run_writes_results_and_cases(tmp_path: Path) -> None:
     a = saved["contestants"]["A_lazy_amount"]
     assert a["transactions"]["n_transactions"] == 4
     assert a["cases"]["n_cases"] == 3
-    assert set(a["cases"]["by_budget"]) == {"0.005", "0.01", "0.02", "0.05"}
+    assert set(a["cases"]["by_budget"]) == {"0.001", "0.005", "0.01", "0.02", "0.05"}
+    assert "headline" in a
     cases = pl.read_parquet(result.run_dir / "cases_A_lazy_amount.parquet")
     assert cases.height == 3
     assert "score" in cases.columns
@@ -73,6 +93,7 @@ def test_lgbm_run_records_provenance_index_and_cache(tmp_path: Path, synthetic_t
         ),
         contestants=("lazy_amount", "lgbm_checklist"),
         model={"lgbm_checklist": {"n_estimators": 30, "min_child_samples": 5}},
+        n_boot=50,
         raw={"name": "syn", "train_end": date(2015, 1, 1)},  # YAML gives dates
     )
     runs, cache = tmp_path / "runs", tmp_path / "cache"
@@ -84,12 +105,18 @@ def test_lgbm_run_records_provenance_index_and_cache(tmp_path: Path, synthetic_t
     assert b["model"]["library"] == "lightgbm"
     assert "calibration" in b["transactions"]
     assert len(list(cache.glob("checklist_*.parquet"))) == 1
+    assert first.summary["canary"]["ok"] is True
+    comp = first.summary["comparisons"]
+    assert comp["reference"] == "B_checklist_lgbm"
+    a_vs_b = comp["results"]["A_lazy_amount"]
+    assert a_vs_b["ci_low"] <= a_vs_b["diff"] <= a_vs_b["ci_high"]
+    assert {"p_value", "p_holm", "p_bh"} <= set(a_vs_b)
 
     run_experiment(cfg, runs_dir=runs, cache_dir=cache)  # reuses the cache
     assert len(list(cache.glob("checklist_*.parquet"))) == 1
     lines = (runs / "index.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
-    assert set(json.loads(lines[0])["recall_at_1pct"]) == {"A_lazy_amount", "B_checklist_lgbm"}
+    assert set(json.loads(lines[0])["headline_value"]) == {"A_lazy_amount", "B_checklist_lgbm"}
 
 
 def test_two_runs_in_the_same_second_get_separate_folders(tmp_path: Path, monkeypatch) -> None:

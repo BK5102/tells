@@ -8,6 +8,10 @@ Two kinds of feature:
   earlier timestamp. Transactions that share a timestamp are treated as
   simultaneous, so none of them sees the others.
 
+Money-movement features (money in versus out, bursts of new counterparties)
+use the optional `direction` column (+1 outgoing, -1 incoming, 0 internal).
+Card data has no incoming side, so it is treated as all outgoing.
+
 Labels are dropped before anything is computed. Both guarantees are tested
 with `cleanroom.pastonly` in tests/test_checklist_leaks.py.
 """
@@ -20,6 +24,7 @@ WINDOWS = {"1h": "1h", "24h": "24h", "7d": "7d", "30d": "30d"}
 
 CURRENT_COLUMNS = [
     "amount", "log_abs_amount", "is_refund", "hour", "weekday", "is_online", "is_chip", "has_error",
+    "direction",
 ]  # fmt: skip
 HISTORY_COLUMNS = [
     "n_prior", "secs_since_prev",
@@ -27,6 +32,8 @@ HISTORY_COLUMNS = [
     "sum_amount_24h", "sum_amount_7d", "mean_amount_30d", "std_amount_30d", "max_amount_30d",
     "amount_vs_mean_30d", "amount_z_30d", "n_errors_7d", "share_online_30d",
     "is_new_merchant", "is_new_category",
+    "n_new_counterparties_24h", "n_new_counterparties_7d",
+    "in_amount_24h", "out_amount_24h", "in_amount_7d", "out_amount_7d", "n_in_24h", "n_out_24h",
 ]  # fmt: skip
 FEATURE_COLUMNS = CURRENT_COLUMNS + HISTORY_COLUMNS
 
@@ -37,7 +44,9 @@ def _current(tx: pl.DataFrame) -> pl.DataFrame:
         if "errors" in tx.columns
         else pl.lit(False)
     )
+    direction = pl.col("direction") if "direction" in tx.columns else pl.lit(1)
     return tx.with_columns(
+        direction=direction.cast(pl.Int8),
         log_abs_amount=pl.col("amount").abs().log1p(),
         is_refund=(pl.col("amount") < 0).cast(pl.Int8),
         hour=pl.col("ts").dt.hour().cast(pl.Int8),
@@ -59,6 +68,11 @@ def _history(tx: pl.DataFrame) -> pl.DataFrame:
             mx=pl.col("amount").max(),
             n_err=pl.col("has_error").cast(pl.Int64).sum(),
             n_onl=pl.col("is_online").cast(pl.Int64).sum(),
+            n_new=pl.col("is_new_merchant").cast(pl.Int64).sum(),
+            n_in=(pl.col("direction") == -1).cast(pl.Int64).sum(),
+            n_out=(pl.col("direction") == 1).cast(pl.Int64).sum(),
+            amt_in=pl.col("amount").filter(pl.col("direction") == -1).sum(),
+            amt_out=pl.col("amount").filter(pl.col("direction") == 1).sum(),
         )
         .sort("account_id", "ts")
     )
@@ -76,6 +90,11 @@ def _history(tx: pl.DataFrame) -> pl.DataFrame:
             pl.col("mx").max().alias(f"mx_{name}"),
             pl.col("n_err").sum().alias(f"err_{name}"),
             pl.col("n_onl").sum().alias(f"onl_{name}"),
+            pl.col("n_new").sum().alias(f"new_{name}"),
+            pl.col("n_in").sum().alias(f"nin_{name}"),
+            pl.col("n_out").sum().alias(f"nout_{name}"),
+            pl.col("amt_in").sum().alias(f"ain_{name}"),
+            pl.col("amt_out").sum().alias(f"aout_{name}"),
         )
         hist = hist.join(rolled, on=["account_id", "ts"], how="left")
 
@@ -96,6 +115,14 @@ def _history(tx: pl.DataFrame) -> pl.DataFrame:
         max_amount_30d=pl.col("mx_30d"),
         n_errors_7d=pl.col("err_7d").fill_null(0),
         share_online_30d=pl.when(n30 > 0).then(pl.col("onl_30d") / n30),
+        n_new_counterparties_24h=pl.col("new_24h").fill_null(0),
+        n_new_counterparties_7d=pl.col("new_7d").fill_null(0),
+        in_amount_24h=pl.col("ain_24h").fill_null(0.0),
+        out_amount_24h=pl.col("aout_24h").fill_null(0.0),
+        in_amount_7d=pl.col("ain_7d").fill_null(0.0),
+        out_amount_7d=pl.col("aout_7d").fill_null(0.0),
+        n_in_24h=pl.col("nin_24h").fill_null(0),
+        n_out_24h=pl.col("nout_24h").fill_null(0),
     )
 
 

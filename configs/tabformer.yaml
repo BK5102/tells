@@ -14,4 +14,8 @@ split:
   test: {start: 2017-04-01, end: 2020-01-01}
 
 contestants: [lazy_amount, lgbm_checklist]
-budgets: [0.005, 0.01, 0.02, 0.05]
+budgets: [0.001, 0.005, 0.01, 0.02, 0.05]
+headline: {metric: first_day_recall, budget: 0.001}  # 0.5% is near the ceiling here (methodology M12)
+reference: lgbm_checklist
+bootstrap: {n_boot: 1000}
+seed: 0

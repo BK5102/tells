@@ -1,0 +1,20 @@
+# 20,000-account AMLWorld sample for fast development runs. Same split as amlworld.yaml.
+# The split is proposed now and becomes binding when the lock lands (Day 9).
+name: amlworld_small
+dataset: amlworld
+data: data/interim/amlworld_small_n20000_seed0.parquet
+
+split:
+  # The usable data covers only 2022-09-01 to 2022-09-10, so gaps are one day,
+  # not months. Days: Sep 1 Thu, Sep 3-4 weekend, Sep 10 Sat.
+  min_gap_days: 1
+  train: {start: null, end: 2022-09-05}        # Thu Sep 1 to Sun Sep 4: 4 days incl. a weekend
+  valid: {start: 2022-09-06, end: 2022-09-07}  # Tue Sep 6
+  test: {start: 2022-09-08, end: 2022-09-11}   # Thu Sep 8 to Sat Sep 10
+
+contestants: [lazy_amount, lgbm_checklist]
+budgets: [0.001, 0.005, 0.01, 0.02, 0.05]
+headline: {metric: first_day_recall, budget: 0.005}
+reference: lgbm_checklist
+bootstrap: {n_boot: 200}
+seed: 0

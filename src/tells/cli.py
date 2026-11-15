@@ -14,31 +14,44 @@ import polars as pl
 import tells
 from tells.data.sampling import sample_accounts
 from tells.data.schema import validate_transactions
-from tells.data.tabformer import RAW_FILE, load_tabformer
 
 INTERIM = Path("data/interim")
 
 
-def _prepare_tabformer(raw: Path, out_dir: Path, small_n: int, seed: int) -> None:
-    """Parse the raw CSV once and save Parquet: the full set and a small sample."""
+# Default small-sample sizes: TabFormer has 6,139 long-lived cards, AMLWorld
+# has 515,088 mostly short-lived accounts, so it needs more for a similar
+# number of positives.
+SMALL_N = {"tabformer": 300, "amlworld": 20_000}
+
+
+def _prepare(dataset: str, raw: Path | None, out_dir: Path, small_n: int | None, seed: int) -> None:
+    """Parse a raw dataset once and save Parquet: the full set and a small sample."""
+    if dataset == "tabformer":
+        from tells.data.tabformer import RAW_FILE
+        from tells.data.tabformer import load_tabformer as load
+    else:
+        from tells.data.amlworld import RAW_FILE
+        from tells.data.amlworld import load_amlworld as load
+    raw = raw or RAW_FILE
+    small_n = small_n or SMALL_N[dataset]
     if not raw.exists():
         raise SystemExit(f"{raw} not found. See data/README.md for the download command.")
     out_dir.mkdir(parents=True, exist_ok=True)
     start = time.perf_counter()
-    tx = load_tabformer(raw)
+    tx = load(raw)
     validate_transactions(tx)
-    full = out_dir / "tabformer.parquet"
+    full = out_dir / f"{dataset}.parquet"
     tx.write_parquet(full)
 
     picked = sample_accounts(tx["account_id"].unique(), small_n, seed=seed)
     small = tx.filter(pl.col("account_id").is_in(picked))
-    small_path = out_dir / f"tabformer_small_n{small_n}_seed{seed}.parquet"
+    small_path = out_dir / f"{dataset}_small_n{small_n}_seed{seed}.parquet"
     small.write_parquet(small_path)
 
-    print(f"{full}: {tx.height:,} transactions, {tx['account_id'].n_unique():,} accounts")
+    print(f"{full}: {tx.height:,} rows, {tx['account_id'].n_unique():,} accounts")
     print(
-        f"{small_path}: {small.height:,} transactions, {len(picked)} accounts, "
-        f"{int(small['label'].sum()):,} positives"
+        f"{small_path}: {small.height:,} rows, {len(picked)} accounts, "
+        f"{int(small['label'].sum()):,} positive rows"
     )
     print(f"done in {time.perf_counter() - start:.0f}s")
 
@@ -49,17 +62,30 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command")
 
     prep = sub.add_parser("prepare", help="convert a raw dataset into standard-schema Parquet")
-    prep.add_argument("dataset", choices=["tabformer"])
-    prep.add_argument("--raw", type=Path, default=RAW_FILE)
+    prep.add_argument("dataset", choices=["tabformer", "amlworld"])
+    prep.add_argument("--raw", type=Path, default=None)
     prep.add_argument("--out", type=Path, default=INTERIM)
-    prep.add_argument("--small-n", type=int, default=300, help="accounts in the small sample")
+    prep.add_argument("--small-n", type=int, default=None, help="accounts in the small sample")
     prep.add_argument("--seed", type=int, default=0)
 
     run = sub.add_parser("run", help="run an experiment config on the validation period")
     run.add_argument("config", type=Path)
-    run.add_argument("--part", default="valid", help="valid (test needs the lock, Day 9)")
+    run.add_argument("--part", default="valid", help="valid, or test (needs `tells lock` first)")
+
+    lock = sub.add_parser("lock", help="seal a config before scoring its test period")
+    lock.add_argument("config", type=Path)
+    lock.add_argument("--note", default="", help="why the plan is being sealed now")
 
     args = parser.parse_args(argv)
+    if args.command == "lock":
+        from cleanroom.lock import seal
+
+        from tells.config import load_config
+        from tells.harness import LOCKS_DIR
+
+        sealed = seal(load_config(args.config).raw, LOCKS_DIR, note=args.note)
+        print(f"sealed {args.config} as {sealed.path}. Commit this file before scoring the test.")
+        return 0
     if args.command == "run":
         from tells.config import load_config
         from tells.harness import run_experiment
@@ -72,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"tells {tells.__version__}, cleanroom {cleanroom.__version__}")
         return 0
     if args.command == "prepare":
-        _prepare_tabformer(args.raw, args.out, args.small_n, args.seed)
+        _prepare(args.dataset, args.raw, args.out, args.small_n, args.seed)
         return 0
     parser.print_help()
     return 0
