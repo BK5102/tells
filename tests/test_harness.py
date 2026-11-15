@@ -132,3 +132,30 @@ def test_two_runs_in_the_same_second_get_separate_folders(tmp_path: Path, monkey
     second = run_experiment(cfg, runs_dir=runs, cache_dir=cache)
     assert first.run_dir != second.run_dir
     assert (first.run_dir / "results.json").exists() and (second.run_dir / "results.json").exists()
+
+
+def test_label_permutation_control_is_consistent_with_chance(tmp_path: Path, synthetic_tx) -> None:
+    data = tmp_path / "synthetic.parquet"
+    synthetic_tx.write_parquet(data)
+    cfg = ExperimentConfig(
+        name="perm",
+        dataset="synthetic",
+        data=data,
+        split=Split(
+            train=Window(None, datetime(2015, 1, 1)),
+            valid=Window(datetime(2015, 2, 1), datetime(2015, 8, 1)),
+            test=Window(datetime(2015, 9, 1), datetime(2016, 1, 1)),
+        ),
+        contestants=("lgbm_checklist",),
+        model={"lgbm_checklist": {"n_estimators": 30, "min_child_samples": 5}},
+        headline_budget=0.05,
+        budgets=(0.05,),
+        n_boot=100,
+        controls=("label_permutation",),
+        raw={"name": "perm"},
+    )
+    s = run_experiment(cfg, runs_dir=tmp_path / "runs", cache_dir=tmp_path / "cache").summary
+    control = s["controls"]["label_permutation"]
+    real = s["contestants"]["B_checklist_lgbm"]["headline"]
+    assert control["consistent_with_chance"] is True
+    assert control["permuted_headline"] < real  # the real model learned something the noise did not

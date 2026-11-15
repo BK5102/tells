@@ -188,6 +188,51 @@ def tsfm_features(
     return tx, info
 
 
+def label_permutation_control(
+    cfg: ExperimentConfig,
+    parts: dict[str, pl.DataFrame],
+    eval_rows: pl.DataFrame,
+    known_positive: set[str],
+) -> dict[str, Any]:
+    """Retrain the reference model on training labels shuffled within each day.
+
+    Shuffling keeps each day's fraud rate but breaks any link between behavior
+    and fraud, so the model learns noise. Scored the usual way, it must do no
+    better than random ranking (a constant score, which catches exactly the
+    budget share). If it does better, labels are reaching the evaluation some
+    other way. Methodology M37.
+    """
+    train = parts["train"].with_columns(
+        label=pl.col("label").shuffle(seed=cfg.seed).over(pl.col("ts").dt.date())
+    )
+    model = make_contestant(cfg.reference, cfg.model)
+    model.fit(train)
+    permuted = build_cases(
+        eval_rows.with_columns(score=model.score(eval_rows)),
+        score_col="score",
+        known_positive_accounts=known_positive,
+    )
+    random = permuted.with_columns(score=pl.lit(0.0))
+    comp = compare_to_reference(
+        {"random": random, "permuted": permuted},
+        "random",
+        cfg.headline_metric,
+        cfg.headline_budget,
+        cfg.n_boot,
+        cfg.seed,
+    )["results"]["permuted"]
+    consistent_with_chance = comp["ci_low"] <= 0 <= comp["ci_high"] or comp["diff"] <= 0
+    return {
+        "what": "reference model trained on labels shuffled within each training day",
+        "permuted_headline": comp["contestant_value"],
+        "random_headline": comp["reference_value"],
+        "difference": comp["diff"],
+        "ci_low": comp["ci_low"],
+        "ci_high": comp["ci_high"],
+        "consistent_with_chance": consistent_with_chance,
+    }
+
+
 def run_experiment(
     cfg: ExperimentConfig,
     part: str = "valid",
@@ -265,8 +310,35 @@ def run_experiment(
             "transactions": transaction_metrics(scored, contestant.outputs_probability),
             "cases": case_metrics(cases, cfg.budgets),
         }
+        if hasattr(contestant, "explain"):
+            explanation = contestant.explain(eval_rows, seed=cfg.seed)
+            # Readable examples: the highest-scored new-bad account-days and their top reasons.
+            first_cases = cases.filter(pl.col("is_first_positive")).sort("score", descending=True)
+            examples = []
+            for case in first_cases.head(5).iter_rows(named=True):
+                rows = scored.filter(
+                    (pl.col("account_id") == case["account_id"])
+                    & (pl.col("ts").dt.date() == case["day"])
+                ).sort("score", descending=True)
+                reasons = contestant.top_reasons(rows.head(1))
+                examples.append(
+                    {
+                        "account_id": case["account_id"],
+                        "day": str(case["day"]),
+                        "score": case["score"],
+                        "top_reasons": reasons[0] if reasons else [],
+                    }
+                )
+            explanation["examples"] = examples
+            contestants[contestant.name]["explanation"] = explanation
         contestants[contestant.name]["headline"] = headline(
             contestants[contestant.name]["cases"], cfg.headline_metric, cfg.headline_budget
+        )
+
+    controls: dict[str, Any] = {}
+    if "label_permutation" in cfg.controls:
+        controls["label_permutation"] = label_permutation_control(
+            cfg, parts, eval_rows, known_positive
         )
 
     comparisons = None
@@ -294,6 +366,7 @@ def run_experiment(
         "positives": {n: int(p["label"].sum()) for n, p in parts.items() if "label" in p.columns},
         "contestants": contestants,
         "comparisons": comparisons,
+        "controls": controls,
     }
     if lock is not None:
         previous = len(lock.uses())

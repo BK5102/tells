@@ -158,6 +158,47 @@ class LightGBMContestant:
         gains = self._booster.feature_importance(importance_type="gain")
         return dict(zip(self.feature_names, (float(g) for g in gains), strict=True))
 
+    def explain(self, rows: pl.DataFrame, max_rows: int = 20_000, seed: int = 0) -> dict[str, Any]:
+        """SHAP contributions (LightGBM's built-in TreeSHAP) on a sample of rows.
+
+        Returns mean absolute contribution per column, the share coming from
+        TSFM columns (names containing "_pc", "_surprise_", "_has_history"),
+        and the raw contributions for the caller to build examples.
+        Methodology M38.
+        """
+        if self._booster is None:
+            raise RuntimeError("fit() must be called before explain()")
+        sample = rows.sample(min(max_rows, rows.height), seed=seed) if rows.height else rows
+        contrib = self._booster.predict(self._matrix(sample), pred_contrib=True)[:, :-1]
+        mean_abs = np.abs(contrib).mean(axis=0)
+        total = float(mean_abs.sum()) or 1.0
+        tsfm_markers = ("_pc", "_surprise_", "_has_history")
+        tsfm_share = (
+            sum(
+                float(v)
+                for name, v in zip(self.feature_names, mean_abs, strict=True)
+                if any(m in name for m in tsfm_markers)
+            )
+            / total
+        )
+        ranked = sorted(zip(self.feature_names, mean_abs, strict=True), key=lambda x: -x[1])
+        return {
+            "n_rows_explained": int(sample.height),
+            "mean_abs_shap": {name: float(v) for name, v in ranked},
+            "tsfm_share_of_attribution": tsfm_share,
+        }
+
+    def top_reasons(self, rows: pl.DataFrame, k: int = 3) -> list[list[tuple[str, float]]]:
+        """For each row, the k columns that pushed its score up the most."""
+        if self._booster is None or rows.height == 0:
+            return []
+        contrib = self._booster.predict(self._matrix(rows), pred_contrib=True)[:, :-1]
+        out = []
+        for row in contrib:
+            idx = np.argsort(-row)[:k]
+            out.append([(self.feature_names[i], float(row[i])) for i in idx])
+        return out
+
     def describe(self) -> dict[str, Any]:
         return {
             "library": "lightgbm",

@@ -26,6 +26,7 @@ class ExperimentConfig:
     reference: str = "lgbm_checklist"
     n_boot: int = 1000
     seed: int = 0
+    controls: tuple[str, ...] = ()
     model: dict[str, Any] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)  # the parsed file, hashed by the lock
 
@@ -55,6 +56,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
         reference=raw.get("reference", "lgbm_checklist"),
         n_boot=int(raw.get("bootstrap", {}).get("n_boot", 1000)),
         seed=int(raw.get("seed", 0)),
+        controls=tuple(raw.get("controls", ())),
         model=raw.get("model", {}),
         raw=raw,
     )

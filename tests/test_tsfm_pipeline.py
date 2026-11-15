@@ -131,6 +131,11 @@ def test_full_run_with_all_four_contestants(synthetic_tx: pl.DataFrame, tmp_path
     assert set(s["comparisons"]["results"]) == expected - {"B_checklist_lgbm"}
     assert s["comparisons"]["n_comparisons"] == 3
     assert "fake_pc0" in s["contestants"]["D_checklist_tsfm_fake"]["model"]["feature_gain"]
+    d_exp = s["contestants"]["D_checklist_tsfm_fake"]["explanation"]
+    assert 0 <= d_exp["tsfm_share_of_attribution"] <= 1
+    assert s["contestants"]["B_checklist_lgbm"]["explanation"]["tsfm_share_of_attribution"] == 0
+    assert s["contestants"]["C_tsfm_only_fake"]["explanation"]["tsfm_share_of_attribution"] > 0.99
+    assert all(len(e["top_reasons"]) == 3 for e in d_exp["examples"])
 
 
 def test_cache_refuses_a_different_model_revision(

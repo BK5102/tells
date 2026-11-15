@@ -123,3 +123,7 @@ No GPU is available, so what runs is set by measured CPU cost: TTM (2 to 3 ms pe
 ### Model versions pinned (2026-11-14)
 
 Chronos-2 is pinned to Hugging Face commit 29ec3766 and TTM r2 to d6a79570, and the embedding cache refuses to mix outputs from different model versions. The first TSFM validation batch (started at commit 00d2157) loaded TTM as "main", which resolved to the same commit d6a79570 (shown in the run log); its later runs are stamped with the pinning commit but executed the code loaded at start, which differs only in this version metadata.
+
+## Days 18 and 19 (2026-11-14): label-permutation control and explanations
+
+The control retrains the bank-style model on labels shuffled within each day and requires it to score no better than random ranking; if it did better, labels would be leaking into the evaluation some other way. Explanations use LightGBM's built-in SHAP values: each run now lists the columns that drive each model's scores, the share of contestant D's reasoning that comes from the TSFM columns, and the top reasons for the five highest-ranked newly bad accounts. Analogy: a placebo group in a drug trial (the noise-trained model must not "work"), and a doctor who can say which symptoms led to the diagnosis.

@@ -209,6 +209,21 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why this is still a fair test: contestant D is compared with B on exactly the same rows each time, so a sample result is a valid comparison, just with wider intervals.
 - Limitation: the Chronos-2 result rests on a 20,000-account sample (about 23 newly bad accounts on its validation day), so its interval will be wide and cannot confirm a small effect.
 
+
+## 10. Controls and explanations
+
+**M37. Label-permutation control: a model trained on noise must score like random ranking.**
+- What: the reference model (B) is retrained on training labels shuffled within each day, keeping each day's fraud rate but breaking any link between behavior and fraud. It is scored on the evaluation period and compared, with the paired account bootstrap, to a constant score (random ranking, which catches exactly the budget share).
+- Why: if a noise-trained model beats random, labels are reaching the evaluation some other way (a leaky feature, a cache, a join), and every other result would be suspect. It complements the canary: the canary tests the feature checks, this tests the whole pipeline end to end.
+- Considered: shuffling the order of each account's history ("time-shuffled control"). Kept for the TSFM ablations (does order matter?), because it answers a science question rather than a leak question, and it needs a second embedding run.
+- Limitation: it detects leaks that carry label information; it cannot detect a leak that only makes the real model look slightly better.
+
+**M38. Explanations use LightGBM's built-in SHAP values.**
+- What: on up to 20,000 evaluated transactions, each column's contribution to each score is computed (TreeSHAP), averaged in absolute value, and the share coming from TSFM columns is reported. The five highest-scored newly bad account-days are listed with their three biggest reasons.
+- Why: a fraud team must be able to say why an account was flagged. The TSFM share answers a central question directly: when D beats B, is it because of the TSFM columns?
+- Considered: permutation importance (slower, and unstable with correlated columns); the separate `shap` package (an extra dependency for the same TreeSHAP values).
+- Limitation: SHAP explains the model, not the world; an embedding component is still hard to put into words. Example accounts are synthetic.
+
 ---
 
 ## Limitations register
