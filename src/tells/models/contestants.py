@@ -80,18 +80,28 @@ class LGBMParams:
 CATEGORICAL = ("category", "channel")
 
 
-class ChecklistLightGBM:
-    """Contestant B: checklist features plus category and channel into a LightGBM model.
+class LightGBMContestant:
+    """A LightGBM model on a named set of numeric columns plus optional categories.
 
-    Roughly what banks use today: hand-built red flags and a tree model.
+    Contestants B, C, and D are all instances of this class with the same
+    settings; only their input columns differ, so any difference in results
+    comes from the inputs (methodology M22).
     """
 
-    name = "B_checklist_lgbm"
     outputs_probability = True
 
-    def __init__(self, params: LGBMParams | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        numeric: list[str],
+        categorical: tuple[str, ...],
+        params: LGBMParams | None = None,
+    ) -> None:
+        self.name = name
+        self.numeric = list(numeric)
+        self.categorical = tuple(categorical)
         self.params = params or LGBMParams()
-        self.feature_names = [*FEATURE_COLUMNS, *(f"{c}_code" for c in CATEGORICAL)]
+        self.feature_names = [*self.numeric, *(f"{c}_code" for c in self.categorical)]
         self._categories: dict[str, dict[str, int]] = {}
         self._booster: lgb.Booster | None = None
 
@@ -101,13 +111,13 @@ class ChecklistLightGBM:
             f"{c}_code": rows[c].replace_strict(
                 self._categories[c], default=-1, return_dtype=pl.Int32
             )
-            for c in CATEGORICAL
+            for c in self.categorical
         }
-        return rows.select(FEATURE_COLUMNS).with_columns(**codes).cast(pl.Float64).to_numpy()
+        return rows.select(self.numeric).with_columns(**codes).cast(pl.Float64).to_numpy()
 
     def fit(self, train: pl.DataFrame) -> None:
         p = self.params
-        for c in CATEGORICAL:
+        for c in self.categorical:
             counts = train[c].value_counts()
             common = counts.filter(pl.col("count") >= p.min_category_count)[c].sort()
             self._categories[c] = {v: i for i, v in enumerate(common.to_list())}
@@ -115,7 +125,7 @@ class ChecklistLightGBM:
             self._matrix(train),
             label=train["label"].to_numpy(),
             feature_name=self.feature_names,
-            categorical_feature=[f"{c}_code" for c in CATEGORICAL],
+            categorical_feature=[f"{c}_code" for c in self.categorical] or "auto",
             free_raw_data=True,
             params={"verbose": -1},
         )
@@ -141,6 +151,13 @@ class ChecklistLightGBM:
             raise RuntimeError("fit() must be called before score()")
         return pl.Series("score", self._booster.predict(self._matrix(rows)))
 
+    def feature_importance(self) -> dict[str, float]:
+        """Total gain per input column (how much each column improved the trees)."""
+        if self._booster is None:
+            return {}
+        gains = self._booster.feature_importance(importance_type="gain")
+        return dict(zip(self.feature_names, (float(g) for g in gains), strict=True))
+
     def describe(self) -> dict[str, Any]:
         return {
             "library": "lightgbm",
@@ -148,14 +165,55 @@ class ChecklistLightGBM:
             "params": asdict(self.params),
             "features": self.feature_names,
             "n_categories": {c: len(m) for c, m in self._categories.items()},
+            "feature_gain": self.feature_importance(),
         }
 
 
+class ChecklistLightGBM(LightGBMContestant):
+    """Contestant B: checklist features plus category and channel into LightGBM.
+
+    Roughly what banks use today: hand-built red flags and a tree model.
+    """
+
+    def __init__(self, params: LGBMParams | None = None) -> None:
+        super().__init__("B_checklist_lgbm", FEATURE_COLUMNS, CATEGORICAL, params)
+
+
 def make_contestant(key: str, model_config: dict[str, Any] | None = None) -> Contestant:
-    """Build a contestant from its config key; settings come from model_config[key]."""
-    settings = (model_config or {}).get(key)
+    """Build a contestant from its config key.
+
+    Keys: "lazy_amount" (A), "lgbm_checklist" (B), "tsfm_only:<model>" (C),
+    "checklist_tsfm:<model>" (D). B, C, and D all use the LightGBM settings
+    under model_config["lgbm_checklist"], so they differ only in their inputs.
+    PCA size comes from model_config["tsfm"]["pca_components"].
+    """
+    from tells.features.tsfm_features import feature_names as tsfm_names
+
+    cfg = model_config or {}
+    params = LGBMParams.from_dict(cfg.get("lgbm_checklist"))
+    k = int(cfg.get("tsfm", {}).get("pca_components", 16))
     if key == "lazy_amount":
         return LazyAmount()
     if key == "lgbm_checklist":
-        return ChecklistLightGBM(LGBMParams.from_dict(settings))
+        return ChecklistLightGBM(params)
+    kind, _, model = key.partition(":")
+    if kind == "tsfm_only" and model:
+        return LightGBMContestant(f"C_tsfm_only_{model}", tsfm_names(model, k), (), params)
+    if kind == "checklist_tsfm" and model:
+        return LightGBMContestant(
+            f"D_checklist_tsfm_{model}",
+            [*FEATURE_COLUMNS, *tsfm_names(model, k)],
+            CATEGORICAL,
+            params,
+        )
     raise ValueError(f"unknown contestant {key!r}")
+
+
+def tsfm_models_needed(keys: tuple[str, ...]) -> list[str]:
+    """TSFM names that the listed contestants need, in order."""
+    out: list[str] = []
+    for key in keys:
+        kind, _, model = key.partition(":")
+        if kind in ("tsfm_only", "checklist_tsfm") and model and model not in out:
+            out.append(model)
+    return out

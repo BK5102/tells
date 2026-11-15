@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import polars as pl
 from cleanroom.canary import run_canary
 from cleanroom.lock import LockMissingError, require_lock
@@ -32,13 +33,30 @@ from tells.config import ExperimentConfig
 from tells.data.sampling import sample_accounts
 from tells.data.schema import validate_transactions
 from tells.evaluate import case_metrics, compare_to_reference, headline, transaction_metrics
-from tells.models.contestants import make_contestant
+from tells.features.tsfm_features import (
+    TSFM_CACHE,
+    add_tsfm_features,
+    compute_tsfm_cache,
+    fit_pca,
+    load_tsfm_table,
+)
+from tells.models.contestants import make_contestant, tsfm_models_needed
+from tells.models.tsfm import make_adapter
 
 RUNS_DIR = Path("artifacts/runs")
 FEATURE_CACHE = Path("data/interim/features")
 LOCKS_DIR = Path("locks")  # tracked in git: the commit history dates each lock
 EVAL_PARTS = ("valid", "test")
-PACKAGES = ("tells", "cleanroom", "polars", "numpy", "lightgbm")
+PACKAGES = (
+    "tells",
+    "cleanroom",
+    "polars",
+    "numpy",
+    "lightgbm",
+    "torch",
+    "chronos-forecasting",
+    "granite-tsfm",
+)
 
 
 def _now() -> datetime:
@@ -128,12 +146,54 @@ def canary_check(tx: pl.DataFrame, seed: int = 0) -> dict[str, bool]:
     return report.to_dict()
 
 
+def tsfm_features(
+    cfg: ExperimentConfig, tx: pl.DataFrame, data_sha: str, root: Path = TSFM_CACHE
+) -> tuple[pl.DataFrame, dict[str, Any]]:
+    """Add TSFM columns for every model the contestants need (methodology M32 to M34)."""
+    settings = dict(cfg.model.get("tsfm", {}))
+    context = int(settings.pop("context", 256))
+    k = int(settings.pop("pca_components", 16))
+    chunk = int(settings.pop("chunk", 20_000))
+    adapter_kwargs = settings.pop("adapter", {})
+    windows = cfg.split.windows()
+    in_any = pl.lit(False)
+    for _, w in windows:
+        in_any = in_any | w.mask("ts")
+    keys = tx.filter(in_any).select("account_id", day=pl.col("ts").dt.date()).unique()
+    train = dict(windows)["train"]
+
+    def train_days(days: pl.Series) -> np.ndarray:
+        inside = days < train.end.date()
+        if train.start is not None:
+            inside = inside & (days >= train.start.date())
+        return inside.to_numpy()
+
+    info: dict[str, Any] = {}
+    for model in tsfm_models_needed(cfg.contestants):
+        adapter = make_adapter(model, **adapter_kwargs.get(model, {}))
+        t0 = time.perf_counter()
+        cache = compute_tsfm_cache(adapter, tx, keys, data_sha, context, chunk, root)
+        mean, components, explained = fit_pca(cache, train_days, k)
+        tx = add_tsfm_features(tx, load_tsfm_table(cache, model, mean, components), model)
+        info[model] = {
+            "version": adapter.version,
+            "cache": str(cache),
+            "context": context,
+            "pca_components": k,
+            "pca_variance_explained": explained,
+            "n_account_days": keys.height,
+            "seconds_including_cache": time.perf_counter() - t0,
+        }
+    return tx, info
+
+
 def run_experiment(
     cfg: ExperimentConfig,
     part: str = "valid",
     runs_dir: Path = RUNS_DIR,
     cache_dir: Path = FEATURE_CACHE,
     locks_dir: Path = LOCKS_DIR,
+    tsfm_dir: Path = TSFM_CACHE,
 ) -> RunResult:
     if part not in EVAL_PARTS:
         raise ValueError(f"part must be one of {EVAL_PARTS}, got {part!r}")
@@ -158,6 +218,7 @@ def run_experiment(
     # dropped inside the builder.
     feats = checklist_features(tx, data_sha, cache_dir)
     tx = tx.join(feats, on="tx_id", how="left", maintain_order="left")
+    tx, tsfm_info = tsfm_features(cfg, tx, data_sha, tsfm_dir)
     # Accounts already labeled positive before the evaluation window starts.
     # Used only to define "first fraud day" in the answer key, never as a model
     # input, and it reads no labels from the evaluated window or later.
@@ -226,6 +287,7 @@ def run_experiment(
         "config": cfg.raw,
         "headline": {"metric": cfg.headline_metric, "budget": cfg.headline_budget},
         "canary": canary,
+        "tsfm": tsfm_info,
         "known_positive_accounts_before_window": len(known_positive),
         "rows": {name: p.height for name, p in parts.items()},
         "positives": {n: int(p["label"].sum()) for n, p in parts.items() if "label" in p.columns},

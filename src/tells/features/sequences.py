@@ -41,37 +41,45 @@ def _events(tx: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+class SequenceIndex:
+    """Index an account's events once, then cut many account-day sequences from it."""
+
+    def __init__(self, tx: pl.DataFrame) -> None:
+        ev = _events(tx)
+        self._by_account = {
+            acct: (group["ts"].to_numpy(), {c: group[c].to_numpy() for c in CHANNELS})
+            for (acct,), group in ev.partition_by("account_id", as_dict=True).items()
+        }
+
+    def build(self, keys: pl.DataFrame, context: int = DEFAULT_CONTEXT) -> pl.DataFrame:
+        """One row per (account_id, day) in `keys`: length plus one list column per channel."""
+        out: dict[str, list] = {"account_id": [], "day": [], "length": []}
+        out.update({c: [] for c in CHANNELS})
+        empty = (np.array([], dtype="datetime64[us]"), {})
+        for acct, day in keys.select("account_id", "day").iter_rows():
+            cutoff = np.datetime64(datetime.combine(day, time.min), "us")
+            ts, chans = self._by_account.get(acct, empty)
+            end = int(np.searchsorted(ts, cutoff, side="left"))  # strictly before midnight
+            start = max(0, end - context)
+            out["account_id"].append(acct)
+            out["day"].append(day)
+            out["length"].append(end - start)
+            for c in CHANNELS:
+                out[c].append(chans[c][start:end].tolist() if end > start else [])
+        schema = {
+            "account_id": pl.Utf8,
+            "day": pl.Date,
+            "length": pl.Int64,
+            **{c: pl.List(pl.Float64) for c in CHANNELS},
+        }
+        return pl.DataFrame(out, schema=schema)
+
+
 def build_sequences(
     tx: pl.DataFrame, keys: pl.DataFrame, context: int = DEFAULT_CONTEXT
 ) -> pl.DataFrame:
-    """Return one row per (account_id, day) in `keys`: length plus one list column per channel."""
-    ev = _events(tx)
-    by_account = {
-        acct: (
-            group["ts"].to_numpy(),
-            {c: group[c].to_numpy() for c in CHANNELS},
-        )
-        for (acct,), group in ev.partition_by("account_id", as_dict=True).items()
-    }
-    out: dict[str, list] = {"account_id": [], "day": [], "length": []}
-    out.update({c: [] for c in CHANNELS})
-    for acct, day in keys.select("account_id", "day").iter_rows():
-        cutoff = np.datetime64(datetime.combine(day, time.min), "us")
-        ts, chans = by_account.get(acct, (np.array([], dtype="datetime64[us]"), {}))
-        end = int(np.searchsorted(ts, cutoff, side="left"))  # events strictly before midnight
-        start = max(0, end - context)
-        out["account_id"].append(acct)
-        out["day"].append(day)
-        out["length"].append(end - start)
-        for c in CHANNELS:
-            out[c].append(chans[c][start:end].tolist() if end > start else [])
-    schema = {
-        "account_id": pl.Utf8,
-        "day": pl.Date,
-        "length": pl.Int64,
-        **{c: pl.List(pl.Float64) for c in CHANNELS},
-    }
-    return pl.DataFrame(out, schema=schema)
+    """One row per (account_id, day) in `keys`: length plus one list column per channel."""
+    return SequenceIndex(tx).build(keys, context)
 
 
 def sequence_summary(seqs: pl.DataFrame) -> pl.DataFrame:
