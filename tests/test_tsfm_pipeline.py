@@ -59,8 +59,8 @@ def test_pca_uses_training_days_only(synthetic_tx: pl.DataFrame, tmp_path: Path)
         amount=pl.when(later).then(pl.col("amount") * 1000).otherwise(pl.col("amount"))
     )
     b = compute_tsfm_cache(FakeTSFM(), changed, keys, "sha-b", 16, 500, tmp_path, _quiet)
-    mean_a, comp_a, _ = fit_pca(a, train, 3)
-    mean_b, comp_b, _ = fit_pca(b, train, 3)
+    mean_a, _, comp_a, _ = fit_pca(a, train, 3)
+    mean_b, _, comp_b, _ = fit_pca(b, train, 3)
     np.testing.assert_allclose(mean_a, mean_b, rtol=1e-3)
     np.testing.assert_allclose(np.abs(comp_a), np.abs(comp_b), atol=1e-3)
 
@@ -183,3 +183,32 @@ def test_report_numbers_come_from_the_results_file(
     for name, c in s["contestants"].items():
         assert name in text
         assert f"{100 * c['headline']:.1f}%" in text  # the exact stored value, formatted by code
+
+
+def test_standardized_pca_is_not_dominated_by_one_large_number(tmp_path: Path) -> None:
+    from tells.features.tsfm_features import fit_pca
+
+    rng = np.random.default_rng(0)
+    part = tmp_path / "cache" / "part_00000"
+    part.mkdir(parents=True)
+    n = 2000
+    emb = rng.normal(size=(n, 6))
+    emb[:, 0] *= 500  # one number on a far larger scale, as seen in TTM's output
+    np.save(part / "emb.npy", emb.astype(np.float16))
+    np.save(part / "fc.npy", np.zeros((n, 2), dtype=np.float32))
+    pl.DataFrame(
+        {
+            "account_id": [str(i) for i in range(n)],
+            "day": [date(2020, 1, 1)] * n,
+            "has_history": [1] * n,
+        }
+    ).with_columns(pl.col("has_history").cast(pl.Int8)).write_parquet(part / "keys.parquet")
+    (part / "done").write_text("ok")
+
+    def all_days(days: pl.Series) -> np.ndarray:
+        return np.ones(len(days), dtype=bool)
+
+    _, _, _, raw_share = fit_pca(tmp_path / "cache", all_days, 1, standardize=False)
+    _, _, _, std_share = fit_pca(tmp_path / "cache", all_days, 1, standardize=True)
+    assert raw_share > 0.99  # the large number takes everything
+    assert std_share < 0.3  # after scaling, no single direction dominates

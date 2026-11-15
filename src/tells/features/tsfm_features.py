@@ -109,8 +109,16 @@ def _parts(cache: Path) -> list[Path]:
     return sorted(p for p in cache.glob("part_*") if (p / "done").exists())
 
 
-def fit_pca(cache: Path, train_days: Callable[[pl.Series], np.ndarray], k: int):
-    """Mean and top-k components from training-window account-days with a history."""
+def fit_pca(
+    cache: Path, train_days: Callable[[pl.Series], np.ndarray], k: int, standardize: bool = True
+):
+    """Mean, scale, and top-k components from training-window account-days with a history.
+
+    With `standardize` (the default since 2026-11-14), every embedding number is
+    divided by its training-period standard deviation before PCA, so a handful
+    of very large-scale numbers cannot dominate the components. Without it, on
+    TTM, one direction held 97% of the variance (methodology M34).
+    """
     n, s, ss = 0, None, None
     for part in _parts(cache):
         keys = pl.read_parquet(part / "keys.parquet")
@@ -126,21 +134,24 @@ def fit_pca(cache: Path, train_days: Callable[[pl.Series], np.ndarray], k: int):
         raise ValueError("not enough training account-days with history to fit PCA")
     mean = s / n
     cov = ss / n - np.outer(mean, mean)
+    scale = np.sqrt(np.clip(np.diag(cov), 0, None)) if standardize else np.ones_like(mean)
+    scale = np.where(scale > 1e-8, scale, 1.0)
+    cov = cov / np.outer(scale, scale)
     values, vectors = np.linalg.eigh(cov)
     top = np.argsort(values)[::-1][:k]
     explained = float(values[top].sum() / values.sum())
-    return mean, vectors[:, top], explained
+    return mean, scale, vectors[:, top], explained
 
 
 def load_tsfm_table(
-    cache: Path, model: str, mean: np.ndarray, components: np.ndarray
+    cache: Path, model: str, mean: np.ndarray, scale: np.ndarray, components: np.ndarray
 ) -> pl.DataFrame:
     """Per (account_id, day): PCA components, forecasts, has_history."""
     frames = []
     for part in _parts(cache):
         keys = pl.read_parquet(part / "keys.parquet")
         emb = np.load(part / "emb.npy").astype(np.float64)
-        pcs = ((emb - mean) @ components).astype(np.float32)
+        pcs = (((emb - mean) / scale) @ components).astype(np.float32)
         fc = np.load(part / "fc.npy")
         cols = {f"{model}_pc{i}": pcs[:, i] for i in range(components.shape[1])}
         cols.update({f"{model}_fc_{c}": fc[:, j] for j, c in enumerate(FORECAST_CHANNELS)})

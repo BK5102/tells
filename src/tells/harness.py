@@ -154,6 +154,7 @@ def tsfm_features(
     context = int(settings.pop("context", 256))
     k = int(settings.pop("pca_components", 16))
     chunk = int(settings.pop("chunk", 20_000))
+    standardize = bool(settings.pop("standardize", True))
     adapter_kwargs = settings.pop("adapter", {})
     windows = cfg.split.windows()
     in_any = pl.lit(False)
@@ -173,14 +174,16 @@ def tsfm_features(
         adapter = make_adapter(model, **adapter_kwargs.get(model, {}))
         t0 = time.perf_counter()
         cache = compute_tsfm_cache(adapter, tx, keys, data_sha, context, chunk, root)
-        mean, components, explained = fit_pca(cache, train_days, k)
-        tx = add_tsfm_features(tx, load_tsfm_table(cache, model, mean, components), model)
+        mean, scale, components, explained = fit_pca(cache, train_days, k, standardize)
+        table = load_tsfm_table(cache, model, mean, scale, components)
+        tx = add_tsfm_features(tx, table, model)
         info[model] = {
             "version": adapter.version,
             "revision": adapter.revision,
             "cache": str(cache),
             "context": context,
             "pca_components": k,
+            "pca_standardized": standardize,
             "pca_variance_explained": explained,
             "n_account_days": keys.height,
             "seconds_including_cache": time.perf_counter() - t0,
@@ -274,6 +277,19 @@ def run_experiment(
     )
     parts = split_data(cfg, tx, reveal_test_labels=lock is not None)
     eval_rows = parts[part]
+    # How much history accounts have in training versus evaluation. A large gap
+    # means models are graded on accounts unlike the ones they learned from
+    # (found on AMLWorld 2026-11-14; methodology M41).
+    history_mix = {
+        name: float(
+            frame.group_by("account_id", pl.col("ts").dt.date())
+            .agg(pl.col("n_prior").min())
+            .select((pl.col("n_prior") >= 16).mean())
+            .item()
+        )
+        for name, frame in (("train", parts["train"]), (part, eval_rows))
+        if frame.height
+    }
 
     # The random suffix keeps two runs that start in the same second apart.
     # exist_ok=False below still refuses to overwrite an existing run.
@@ -360,6 +376,7 @@ def run_experiment(
         "config": cfg.raw,
         "headline": {"metric": cfg.headline_metric, "budget": cfg.headline_budget},
         "canary": canary,
+        "history_mix_share_16_plus": history_mix,
         "tsfm": tsfm_info,
         "known_positive_accounts_before_window": len(known_positive),
         "rows": {name: p.height for name, p in parts.items()},

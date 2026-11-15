@@ -197,6 +197,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - What: Chronos-2 gives 768 numbers per 16-event patch for each of the 3 channels; TTM gives 192. Patches are averaged per channel (as in Savvidi et al. 2026) and concatenated (2,304 numbers for Chronos-2, 576 for TTM). PCA is then fitted on the training-window account-days only, with no labels, and the first 16 components are kept. Contestant C uses only the TSFM columns (16 components, 2 surprise scores, a has-history flag); contestant D uses B's columns plus those, with B's exact LightGBM settings.
 - Why average: it gives a fixed-length summary regardless of how long the history is. Why PCA: hundreds of strongly correlated numbers make tree models slow and prone to noise; 16 components keep most of the variation (the share kept is recorded in every run as `pca_variance_explained`). Why training days only: anything fitted on validation or test data would let those periods shape the inputs.
 - Considered: the [REG] summary token (Chronos-2 only, so not comparable across models); keeping all dimensions (too slow on CPU; ablated on Day 26).
+- Changed on 2026-11-14: embedding numbers are now standardized (divided by their training-period spread) before PCA. Without it, a few TTM numbers with spreads up to 479 (median 7) took 97% of the variance, so the "16 components" were really about two directions, one of them mostly history length. The unstandardized run stays on record as a tried variant (M41).
 - Limitation: averaging loses the order of patches inside the history, and 16 components may drop rare patterns; both are ablation items.
 
 **M35. TTM reads a fixed 512-step window, so short histories are padded and marked as not observed.**
@@ -240,6 +241,14 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Tests: a hand-written cassette (not a recording of the real API) exercises the loop, the denials, the budget, the Critic, and the Reporter; replay refuses a request that differs from the recording. Recorded cassettes need an API key.
 - Limitation: the Critic checks claims against intervals, not the quality of the reasoning; an LLM review pass is planned once a key is available. The agent costs money per question (Opus 5.5 pricing in the Claude API docs).
 
+
+**M41. On AMLWorld, accounts in training have far less history than accounts in evaluation; every run now reports this.**
+- Measured: account-days with 16 or more earlier events are 9.3% of training (Sept 1 to 4, median 1 event), 48.4% of validation (Sept 6, median 15), and 62.7% of test (Sept 8 to 10, median 20). The data begins on Sept 1, so histories can only grow.
+- Why it matters: a model learns what TSFM summaries of very short histories look like, then is graded mostly on longer ones it has rarely seen. In the first TTM run (unstandardized PCA), contestant D matched B on short-history accounts (27.9% against 28.1%) but collapsed on long-history ones (3.2% against 38.7%), which pulled its headline 11.6 points below B. The label-permutation control was consistent with chance, so this is not a leak.
+- What was done: standardized PCA (M34), and `history_mix_share_16_plus` in every run's results, so the shift is visible next to the numbers.
+- Variants tried so far on the headline (all counted for multiple-comparison purposes): TTM with unstandardized PCA (run `20261115T031830Z_amlworld_valid_f6ff26be_96919d`); TTM with standardized PCA (next run).
+- Limitation: this is a property of AMLWorld's ten-day span, and no training-window choice removes it. Results on AMLWorld must be read as "TSFM features learned on new accounts, applied to established ones". TabFormer, with decades of history in training, does not have this problem.
+
 ---
 
 ## Limitations register
@@ -264,4 +273,5 @@ The honest list. Each item says what could be wrong and what was done about it.
 | L15 | Full Chronos-2 embedding needs a GPU | Main TSFM results depend on one notebook run | Inputs and outputs checksummed; cache keyed by model, version, account, cutoff; CPU path for samples and TTM |
 | L16 | Chronos-2 only on a sample | Its result has wide intervals | Same rows for B and D; TTM on full data; GPU run left as future work |
 | L17 | One forecast per account-day | Later same-day transactions compare with the first-event forecast | Checklist same-day counts cover within-day activity |
+| L18 | AMLWorld history shift between training and evaluation | TSFM summaries in evaluation look unlike those in training | Measured and reported per run (M41); standardized PCA; TabFormer as the counter-case |
 | L14 | Canary is a spot check | 8 accounts, 10 probes per run | Full past-only proofs are in the unit tests; the canary proves the checks work on the run's own data |
