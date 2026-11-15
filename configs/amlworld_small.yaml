@@ -24,3 +24,4 @@ model:
     context: 256          # most recent events per account-day (M32)
     pca_components: 16    # embedding size after PCA fitted on training days (M34)
     chunk: 50000          # account-days per resumable cache chunk
+controls: [label_permutation]   # methodology M37
