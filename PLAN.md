@@ -417,6 +417,10 @@ Each account active on a day is one case. A case's score is the highest score am
 
 Each row should end in a merged commit with a test. If a day slips, drop the next "nice to have", not the test.
 
+### Status (2026-11-14)
+
+Built and tested: Days 1 to 19, plus the AMLWorld loader (moved up from Day 27) and the label-permutation control (Day 18). Day 20 (cost) is partly covered: every run records fit, score, and TSFM time. Not done for lack of a GPU: Chronos-2 on full data (it runs on the 20,000-account AMLWorld sample instead) and TTM on full TabFormer (about 9 CPU hours, optional). Reasons for every deviation from this plan are in `docs/methodology.md` and `docs/decisions.md`.
+
 ### Phase 0 (done 2026-11-10): decisions and data fit
 
 Decisions D1 to D5 in `docs/decisions.md`; reasons for every method in `docs/methodology.md`; measured dataset fit in `docs/data-fit.md`; `scripts/check_data_fit.py`; repo at https://github.com/BK5102/tells. Owner actions still to do before they are needed: a free Kaggle account for the official AMLWorld download (Day 27) and an Anthropic API key in `.env` (Day 22).
