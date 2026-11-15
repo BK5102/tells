@@ -79,3 +79,22 @@ def test_bootstrap_is_centered_on_the_point_estimate() -> None:
     r = out["results"]["weak"]
     assert r["ci_low"] <= r["diff"] <= r["ci_high"]
     assert abs(r["boot_mean_diff"] - r["diff"]) < 0.03
+
+
+def test_history_slices_keep_the_real_queue() -> None:
+    # One day, 4 cases, 1 slot (25%). The top case is a new bad account with
+    # short history; a second new bad account with long history is ranked last.
+    cases = pl.DataFrame(
+        {
+            "day": [date(2020, 1, 1)] * 4,
+            "score": [4.0, 3.0, 2.0, 1.0],
+            "label": [1, 0, 0, 1],
+            "is_first_positive": [True, False, False, True],
+            "history_len": [3, 50, 50, 40],
+        }
+    )
+    m = case_metrics(cases, (0.25,))
+    h = m["by_history"]
+    assert h["short_history"]["by_budget"]["0.25"]["first_day_recall"] == pytest.approx(1.0)
+    assert h["long_history"]["by_budget"]["0.25"]["first_day_recall"] == pytest.approx(0.0)
+    assert h["short_history"]["n_first_positive_cases"] == 1

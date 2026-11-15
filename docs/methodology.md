@@ -224,6 +224,22 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Considered: permutation importance (slower, and unstable with correlated columns); the separate `shap` package (an extra dependency for the same TreeSHAP values).
 - Limitation: SHAP explains the model, not the world; an embedding component is still hard to put into words. Example accounts are synthetic.
 
+
+## 11. Reporting and the agent
+
+**M39. Reports are rendered by code from run files; the agent gets three tools and nothing else.**
+- What: `tells report <run>` builds every table (headline with intervals, every budget, cost, the TSFM share of attribution, the label-permutation control, the history-length split) from `results.json` and the saved case files. The agent's tool layer allows only `run_experiment` (configs by name, test period only through the lock), `load_results` (summary numbers, never rows), and `plot` (chart data). Arguments are checked against allow-lists and strict patterns, and every call is logged.
+- Why: CLAUDE.md rule 4 (numbers come from result files) is only enforceable if no person or model types a number. Limiting the agent to three narrow tools means it cannot read test labels, raw data, or anything outside the project, whatever it is asked.
+- Considered: giving the agent a Python sandbox (far more flexible, far harder to audit).
+- Limitation: the history-length split for runs made before it existed is recomputed from saved cases and data; the recomputation is tested to use the same functions as live runs.
+
+
+**M40. The agent: Claude Opus 5.5 in a loop we own, a hard tool budget, and a Critic that checks every claim.**
+- What: `tells agent "<question>"` runs Claude Opus 5.5 (`claude-opus-5-5`, effort `high`, strict tool schemas, server-side refusal fallback) in a manual loop: every tool call goes through the three-tool allow-list, denials go back to the model as errors, and the loop stops after 10 tool calls. The model must not write numbers; it ends with a JSON list of the runs it relied on and its claims (contestant, metric, run, direction). The Critic then checks, without any model: no typed numbers, every run exists and passed its canary and control, test runs were locked, and every claimed direction matches the run's bootstrap interval. The Reporter puts the model's narrative next to tables generated from the result files and labels the document a draft for human review.
+- Why a manual loop instead of the SDK's tool runner: every call must pass our gatekeeper and every exchange must be recordable as a cassette, so the loop is ours. Why Opus 5.5: it is the current default Claude model; planning experiments rewards care more than speed. Why the refusal fallback: if the model declines a request, the API retries on a fallback model instead of failing the run (on by default; can be turned off in `src/tells/agent/llm.py`).
+- Tests: a hand-written cassette (not a recording of the real API) exercises the loop, the denials, the budget, the Critic, and the Reporter; replay refuses a request that differs from the recording. Recorded cassettes need an API key.
+- Limitation: the Critic checks claims against intervals, not the quality of the reasoning; an LLM review pass is planned once a key is available. The agent costs money per question (Opus 5.5 pricing in the Claude API docs).
+
 ---
 
 ## Limitations register

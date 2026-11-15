@@ -76,7 +76,50 @@ def main(argv: list[str] | None = None) -> int:
     lock.add_argument("config", type=Path)
     lock.add_argument("--note", default="", help="why the plan is being sealed now")
 
+    rep = sub.add_parser("report", help="Markdown tables for a finished run (numbers from files)")
+    rep.add_argument("run_dir", type=Path)
+    rep.add_argument("--out", type=Path, default=None, help="write to a file instead of stdout")
+    rep.add_argument("--no-history", action="store_true", help="skip the history-length split")
+
+    ag = sub.add_parser("agent", help="ask the experiment agent a question (needs the agent extra)")
+    ag.add_argument("question")
+    ag.add_argument("--cassette", type=Path, default=None, help="replay (or record) responses here")
+    ag.add_argument("--record", action="store_true", help="call Claude and save to --cassette")
+    ag.add_argument("--max-tool-calls", type=int, default=10)
+    ag.add_argument("--out", type=Path, default=Path("artifacts/agent_report.md"))
+
     args = parser.parse_args(argv)
+    if args.command == "agent":
+        from tells.agent.critic import review
+        from tells.agent.llm import AnthropicLLM, CassetteLLM
+        from tells.agent.reporter import build_report
+        from tells.agent.runner import run_agent
+        from tells.agent.tools import Toolbox
+
+        if args.cassette and not args.record:
+            llm = CassetteLLM(args.cassette)
+        elif args.cassette:
+            llm = CassetteLLM(args.cassette, mode="record", backend=AnthropicLLM())
+        else:
+            llm = AnthropicLLM()
+        box = Toolbox()
+        result = run_agent(args.question, box, llm, max_tool_calls=args.max_tool_calls)
+        critic = review(result.final_text, box)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(build_report(result, critic, box), encoding="utf-8")
+        print(f"critic {'passed' if critic.passed else 'FAILED'}; report at {args.out}")
+        return 0 if critic.passed else 1
+    if args.command == "report":
+        from tells.report import render
+
+        text = render(args.run_dir, with_history=not args.no_history)
+        if args.out:
+            args.out.write_text(text, encoding="utf-8")
+            print(f"wrote {args.out}")
+        else:
+            sys.stdout.reconfigure(encoding="utf-8")
+            print(text)
+        return 0
     if args.command == "lock":
         from cleanroom.lock import seal
 

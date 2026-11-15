@@ -21,6 +21,11 @@ tsfm = [
     "chronos-forecasting>=2.3",
     "granite-tsfm>=0.3",
 ]
+# The experiment agent (Claude API). Optional: tests replay recorded cassettes
+# and need no key; live runs need ANTHROPIC_API_KEY or an `ant auth login` profile.
+agent = [
+    "anthropic>=1.0",
+]
 
 [project.scripts]
 tells = "tells.cli:main"

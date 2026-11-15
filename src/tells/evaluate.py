@@ -30,6 +30,43 @@ def _defined(fn, *args):
         raise
 
 
+# 16 events is the patch length Chronos-2 reads; methodology M23 pre-specifies this split.
+HISTORY_THRESHOLD = 16
+
+
+def history_slices(cases: pl.DataFrame, budgets: tuple[float, ...]) -> dict[str, Any] | None:
+    """First-fraud-day and plain recall, split by how much history the account had.
+
+    Each day's review queue is formed on all cases, then catches are counted
+    within each slice, so a slice result answers "of the new bad accounts with
+    little history, how many did today's real queue catch?"
+    """
+    if "history_len" not in cases.columns:
+        return None
+    scores = cases["score"].to_numpy()
+    days = cases["day"].to_numpy()
+    labels = cases["label"].to_numpy().astype(float)
+    first = cases["is_first_positive"].cast(pl.Int8).to_numpy().astype(float)
+    short = (cases["history_len"].fill_null(0) < HISTORY_THRESHOLD).to_numpy()
+    out: dict[str, Any] = {"threshold": HISTORY_THRESHOLD}
+    for name, mask in (("short_history", short), ("long_history", ~short)):
+        slice_out: dict[str, Any] = {
+            "n_first_positive_cases": int(first[mask].sum()),
+            "n_positive_cases": int(labels[mask].sum()),
+            "by_budget": {},
+        }
+        for b in budgets:
+            share = budget_selection(scores, b, days)
+            f = first * mask
+            y = labels * mask
+            slice_out["by_budget"][str(b)] = {
+                "first_day_recall": float((share * f).sum() / f.sum()) if f.sum() else None,
+                "recall": float((share * y).sum() / y.sum()) if y.sum() else None,
+            }
+        out[name] = slice_out
+    return out
+
+
 def case_metrics(cases: pl.DataFrame, budgets: tuple[float, ...]) -> dict[str, Any]:
     """Recall, precision, and first-fraud-day catch at each daily review budget."""
     scores = cases["score"].to_numpy()
@@ -42,6 +79,7 @@ def case_metrics(cases: pl.DataFrame, budgets: tuple[float, ...]) -> dict[str, A
         "n_first_positive_cases": int(first.sum()),
         "case_pr_auc": _defined(average_precision, scores, labels),
         "by_budget": {},
+        "by_history": history_slices(cases, budgets),
     }
     for b in budgets:
         out["by_budget"][str(b)] = {

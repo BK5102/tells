@@ -149,3 +149,37 @@ def test_cache_refuses_a_different_model_revision(
     other.revision = "different-weights"
     with pytest.raises(ValueError, match="revision"):
         compute_tsfm_cache(other, synthetic_tx, keys, "sha-r", 16, 1000, tmp_path, _quiet)
+
+
+def test_report_numbers_come_from_the_results_file(
+    synthetic_tx: pl.DataFrame, tmp_path: Path
+) -> None:
+    from tells.report import budget_table, cost_table, headline_table
+
+    data = tmp_path / "syn.parquet"
+    synthetic_tx.write_parquet(data)
+    cfg = ExperimentConfig(
+        name="rep",
+        dataset="synthetic",
+        data=data,
+        split=Split(
+            train=Window(None, datetime(2015, 1, 1)),
+            valid=Window(datetime(2015, 2, 1), datetime(2015, 8, 1)),
+            test=Window(datetime(2015, 9, 1), datetime(2016, 1, 1)),
+        ),
+        contestants=("lazy_amount", "lgbm_checklist", "checklist_tsfm:fake"),
+        model={
+            "lgbm_checklist": {"n_estimators": 20, "min_child_samples": 5},
+            "tsfm": {"context": 16, "pca_components": 3, "chunk": 500},
+        },
+        n_boot=30,
+        raw={"name": "rep"},
+    )
+    run = run_experiment(
+        cfg, runs_dir=tmp_path / "runs", cache_dir=tmp_path / "cache", tsfm_dir=tmp_path / "tsfm"
+    )
+    s = run.summary
+    text = headline_table(s) + budget_table(s) + cost_table(s)
+    for name, c in s["contestants"].items():
+        assert name in text
+        assert f"{100 * c['headline']:.1f}%" in text  # the exact stored value, formatted by code

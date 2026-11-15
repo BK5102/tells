@@ -34,6 +34,9 @@ def build_cases(
     ]
     if score_col is not None:
         aggs.append(pl.col(score_col).max().alias("score"))
+    if "n_prior" in tx.columns:
+        # Events the account had before its first transaction that day.
+        aggs.append(pl.col("n_prior").min().alias("history_len"))
 
     cases = tx.group_by("account_id", pl.col("ts").dt.date().alias("day")).agg(aggs)
 
