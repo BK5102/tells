@@ -101,3 +101,15 @@ Each run now compares every contestant with the bank-style model on the headline
 ## Day 11 (2026-11-14): canary, leak audit, Cleanroom v0.1
 
 Every run now plants two cheats on its own data (a feature that peeks at the next transaction, and one that peeks at the next label) and refuses to report anything unless both are caught and the honest features pass. The canary immediately found a weakness: a sample with no laundering accounts makes the label cheat invisible, so samples now always include positive accounts. The written audit is in `docs/audits/2026-11-14-day11-leak-audit.md`; the Cleanroom is released as version 0.1.0 under the git tag `cleanroom-v0.1`. Analogy: a smoke detector is tested by holding a match to it, not by trusting the label on the box.
+
+## Validation check, 2026-11-14 (contestants A and B, both datasets, final Phase 3 code)
+
+AMLWorld validation day (run `20261115T020923Z_amlworld_valid_5152975d_4396a0`): the bank-style model caught 31.5% of newly bad accounts on their first bad day at a 0.5% budget, against 2.1% for the lazy baseline (difference -29.5 points, 95% interval -33.0 to -25.9). TabFormer 2016 (run `20261115T021607Z_tabformer_valid_44c6db59_66d055`): 28.4% against 0.7% at the 0.1% budget; at 0.5% the bank-style model reaches 90.1%, confirming the ceiling that led to the tighter budget. Both runs passed the canary, and the bootstrap mean sat on the point estimate in both, confirming the bias fix on real data.
+
+## Day 12 (2026-11-14): which TSFMs, and what they cost on a laptop
+
+Chronos-2 (119.5M parameters, Apache-2.0) has an official `embed` method that returns one embedding per 16-step patch and reads several parallel series of one account at once, so it is the first model; TTM r2 (0.8M parameters, a different lab and design) is the second, for contrast. Measured on this laptop, Chronos-2 takes about 0.4 seconds per account at 256 events and 3 to 4 channels, so embedding every account-day of the AMLWorld validation day alone would take about a day on CPU; full Chronos-2 embedding will run once on a free GPU and be cached, and everything else stays on CPU. Analogy: you can grind coffee by hand for one cup, but for a hundred cups you borrow the café's grinder once and store the grounds. Details: `docs/tsfm-notes.md`, methodology M32.
+
+## Day 13 (2026-11-14): account histories as sequences
+
+`build_sequences` turns each account-day case into the account's most recent 256 events from before midnight that day, as three parallel channels: log amount, log minutes since the previous event, and direction (in, out, internal). The past-only check passes, and a planted bug that let each sequence include its own day's events failed two tests. Analogy: the model reads a customer's diary up to last night, never today's page.

@@ -176,6 +176,16 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Found by this check: a sample with no positive accounts makes the outcome canary undetectable, so the sample now always includes positive accounts and the Cleanroom refuses one-outcome samples.
 - Limitation: 8 accounts and 10 probes is a spot check, not a full proof; the full proofs are the unit tests.
 
+
+## 9. TSFM inputs and compute
+
+**M32. One TSFM embedding per account-day, from the history before that day began; full Chronos-2 runs on a free GPU.**
+- What: for every account-day case, the account's events strictly before midnight of that day form one sequence; its embedding is shared by all of that day's transactions. Chronos-2 embeddings for the full datasets are computed once on a free Colab GPU and cached by model, version, account, and cutoff; development, tests, and the small model run on CPU.
+- Why per account-day: one embedding per transaction (millions) is unaffordable, and the unit being ranked is the account-day anyway. Cutting at midnight is stricter than past-only per transaction, so it cannot leak.
+- Why a GPU for this step only: measured on this laptop, Chronos-2 takes about 0.4 seconds per account at 256 events and 4 input series, so the AMLWorld validation day alone would need about a day of CPU. A GPU is typically one to two orders of magnitude faster for this kind of model (not measured here yet).
+- Considered: embedding once per account per window (cheaper, but stale within the window and empty for AMLWorld training accounts, whose data starts on day one); subsampling accounts for contestant D only (rejected: B and D must be trained on identical rows for a fair comparison).
+- Limitation: same-day transactions before the scored one are invisible to the embedding (the checklist still sees them). The embedding run depends on an external notebook environment; its inputs and outputs are checksummed so the cache can be verified.
+
 ---
 
 ## Limitations register
@@ -197,4 +207,5 @@ The honest list. Each item says what could be wrong and what was done about it.
 | L11 | Headline chosen on validation data | Choosing the budget could favor some model | Chosen before any TSFM existed and before the lock; all budgets reported |
 | L12 | Intervals on few positives | AMLWorld validation is one day; intervals can be wide or unstable | Account-level paired bootstrap, (count + 1) / (n + 1) p-values, Holm and BH, all reported |
 | L13 | The lock does not block code edits | A person could change code between lock and test | Git history shows every edit; the agent will only reach data through the locked harness (Day 21 to 25) |
+| L15 | Full Chronos-2 embedding needs a GPU | Main TSFM results depend on one notebook run | Inputs and outputs checksummed; cache keyed by model, version, account, cutoff; CPU path for samples and TTM |
 | L14 | Canary is a spot check | 8 accounts, 10 probes per run | Full past-only proofs are in the unit tests; the canary proves the checks work on the run's own data |
