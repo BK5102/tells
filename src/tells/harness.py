@@ -177,6 +177,7 @@ def tsfm_features(
         tx = add_tsfm_features(tx, load_tsfm_table(cache, model, mean, components), model)
         info[model] = {
             "version": adapter.version,
+            "revision": adapter.revision,
             "cache": str(cache),
             "context": context,
             "pca_components": k,

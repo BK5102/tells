@@ -14,6 +14,7 @@ from tells.models.tsfm.base import CHANNEL_INDEX, FORECAST_CHANNELS, TSFMOutput
 
 class FakeTSFM:
     name = "fake"
+    revision = "none"
 
     @property
     def version(self) -> str:

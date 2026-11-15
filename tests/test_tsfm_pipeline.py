@@ -131,3 +131,16 @@ def test_full_run_with_all_four_contestants(synthetic_tx: pl.DataFrame, tmp_path
     assert set(s["comparisons"]["results"]) == expected - {"B_checklist_lgbm"}
     assert s["comparisons"]["n_comparisons"] == 3
     assert "fake_pc0" in s["contestants"]["D_checklist_tsfm_fake"]["model"]["feature_gain"]
+
+
+def test_cache_refuses_a_different_model_revision(
+    synthetic_tx: pl.DataFrame, tmp_path: Path
+) -> None:
+    import pytest
+
+    keys = synthetic_tx.select("account_id", day=pl.col("ts").dt.date()).unique().head(50)
+    compute_tsfm_cache(FakeTSFM(), synthetic_tx, keys, "sha-r", 16, 1000, tmp_path, _quiet)
+    other = FakeTSFM()
+    other.revision = "different-weights"
+    with pytest.raises(ValueError, match="revision"):
+        compute_tsfm_cache(other, synthetic_tx, keys, "sha-r", 16, 1000, tmp_path, _quiet)

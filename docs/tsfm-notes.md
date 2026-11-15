@@ -5,7 +5,7 @@ Every row is checked against the model's own code or documentation at build time
 | Model | Checkpoint | License | Size | Embeddings available? (how) | Input type | Context | Pretraining data and cutoff | Source |
 |---|---|---|---|---|---|---|---|---|
 | Chronos-2 | `amazon/chronos-2` (chronos-forecasting 2.3.2) | Apache-2.0 | 119.5M parameters | **Yes, official API.** `Chronos2Pipeline.embed(inputs, batch_size, context_length)` returns, per series, a tensor of shape (n_variates, num_patches + 2, d_model): one embedding per patch plus a [REG] token and a masked output patch | Univariate or multivariate (variates share information through group attention); past-only, known-future, and categorical covariates | Trained up to 8,192 steps | Real univariate datasets (energy, traffic, weather, web, cloud traces, M4) plus synthetic univariate and multivariate data. **No financial or transaction data is listed.** Cutoff: **undisclosed** | `inspect.getdoc(Chronos2Pipeline.embed)`; Hugging Face model card; [Ansari et al. 2025](https://arxiv.org/abs/2510.15821) Table 6 |
-| TTM r2 (Tiny Time Mixer) | `ibm-granite/granite-timeseries-ttm-r2` | Apache-2.0 | 0.8M parameters | To verify on Day 17: backbone hidden states through the `granite-tsfm` package | Multivariate with channel mixing | Fixed context per checkpoint (to verify) | To verify; cutoff undisclosed until checked | Hugging Face model card |
+| TTM r2 (Tiny Time Mixer) | `ibm-granite/granite-timeseries-ttm-r2`, context 512, prediction 96 (granite-tsfm 0.3.12) | Apache-2.0 | 0.8M parameters | **Yes.** The forward pass returns `backbone_hidden_state` of shape (batch, channels, patches, 192) and `prediction_outputs` of shape (batch, 96, channels); `past_observed_mask` marks padding | Multivariate | Fixed 512-step window | Cutoff undisclosed (not checked in a paper yet) | `get_model` output keys inspected 2026-11-14; Hugging Face model card |
 | Chronos-Bolt small | `amazon/chronos-bolt-small` | Apache-2.0 | 47.7M parameters | Not chosen: same family as Chronos-2, so it adds little variety | Univariate | | | Hugging Face API |
 
 CPU timing for Chronos-2 embedding (laptop, 8 logical cores, measured 2026-11-14 while a LightGBM run shared the CPU, so treat as an upper bound), batches of 256 series:
@@ -30,3 +30,14 @@ TabFormer was released in 2020 and AMLWorld in 2023, both before Chronos-2. Neit
 ## How account histories become model input (Day 13 design)
 
 One sequence per account, one step per event, oldest first, as in [Savvidi et al. 2026](https://arxiv.org/html/2610.29667v1): parallel channels for amount (log of absolute USD), time since the previous event (log minutes), direction (+1 out, -1 in, 0 self), and, for TabFormer, an online flag. One sequence per account-day case: only events strictly before midnight of that day enter it (methodology M32), which is stricter than the checklist's per-transaction rule and is tested with `cleanroom.pastonly`. Context is capped (default 256 events) to keep CPU cost bounded; the cap is an ablation on Day 26.
+
+## CPU cost on real account histories (2026-11-14, no other load)
+
+Measured on 512 real account-day histories from each development sample:
+
+| Model | AMLWorld (median 10 events) | TabFormer (256 events) |
+|---|---|---|
+| Chronos-2 embedding | 66 ms per account-day | 283 ms |
+| TTM embedding and forecast | 2.3 ms | 2.9 ms |
+
+Account-days per run: AMLWorld sample 96,177 (21% with no history), TabFormer sample 558,323. What this allows on CPU is in methodology M36.

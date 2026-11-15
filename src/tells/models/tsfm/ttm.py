@@ -21,6 +21,9 @@ import numpy as np
 from tells.models.tsfm.base import CHANNEL_INDEX, FORECAST_CHANNELS, TSFMOutput
 
 MODEL_ID = "ibm-granite/granite-timeseries-ttm-r2"
+# Exact model weights (Hugging Face commit of the 512-96 branch, checked 2026-11-14),
+# so a rerun can never silently pick up different weights.
+REVISION = "d6a79570cac0f33d526601cd3a0fc7c80a8f9a2f"
 CONTEXT = 512
 PREDICTION = 96
 D_MODEL = 192
@@ -37,7 +40,13 @@ class TTMAdapter:
             torch.set_num_threads(threads)
         self._torch = torch
         self.batch_size = batch_size
-        self._model = get_model(MODEL_ID, context_length=CONTEXT, prediction_length=PREDICTION)
+        self.revision = REVISION
+        self._model = get_model(
+            MODEL_ID,
+            context_length=CONTEXT,
+            prediction_length=PREDICTION,
+            model_revision=REVISION,
+        )
         self._model.eval()
 
     @property

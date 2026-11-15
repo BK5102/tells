@@ -113,3 +113,13 @@ Chronos-2 (119.5M parameters, Apache-2.0) has an official `embed` method that re
 ## Day 13 (2026-11-14): account histories as sequences
 
 `build_sequences` turns each account-day case into the account's most recent 256 events from before midnight that day, as three parallel channels: log amount, log minutes since the previous event, and direction (in, out, internal). The past-only check passes, and a planted bug that let each sequence include its own day's events failed two tests. Analogy: the model reads a customer's diary up to last night, never today's page.
+
+## Days 14 to 17 (2026-11-14): TSFM adapters, cache, surprise score, contestants C and D
+
+Every TSFM sits behind one adapter that takes account histories and returns a fixed-length summary (embedding) and a forecast of the next event; Chronos-2 and TTM both have one, and a tiny fake adapter lets every test run without PyTorch. Embeddings are cached on disk in resumable chunks, squeezed to 16 numbers with PCA fitted on training days only, and joined to each transaction with two surprise scores (amount and timing versus the forecast); contestant C uses only these TSFM columns and contestant D adds them to B's checklist, with B's exact settings, so the only thing that changes is the inputs. Analogy: three chefs get the same kitchen and the same oven; one uses only the old recipe book, one only a new spice blend, one both, and you taste the difference.
+
+No GPU is available, so what runs is set by measured CPU cost: TTM (2 to 3 ms per account-day) on full AMLWorld and the TabFormer sample, Chronos-2 (66 ms or more) on the 20,000-account AMLWorld sample only (methodology M36).
+
+### Model versions pinned (2026-11-14)
+
+Chronos-2 is pinned to Hugging Face commit 29ec3766 and TTM r2 to d6a79570, and the embedding cache refuses to mix outputs from different model versions. The first TSFM validation batch (started at commit 00d2157) loaded TTM as "main", which resolved to the same commit d6a79570 (shown in the run log); its later runs are stamped with the pinning commit but executed the code loaded at start, which differs only in this version metadata.

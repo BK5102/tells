@@ -186,6 +186,29 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Considered: embedding once per account per window (cheaper, but stale within the window and empty for AMLWorld training accounts, whose data starts on day one); subsampling accounts for contestant D only (rejected: B and D must be trained on identical rows for a fair comparison).
 - Limitation: same-day transactions before the scored one are invisible to the embedding (the checklist still sees them). The embedding run depends on an external notebook environment; its inputs and outputs are checksummed so the cache can be verified.
 
+
+**M33. Surprise score: how far a transaction is from what the model expected.**
+- What: from the history before midnight, each TSFM forecasts the account's next event: its log amount and its log minutes since the previous event. For every transaction that day, surprise = actual minus forecast, for amount and for gap. Two columns per model.
+- Why: a stolen card or mule account often breaks its own rhythm (a much larger amount, or activity far sooner than usual). The embedding summarizes the history; the surprise score says how unusual today is against it. Its inputs are past-only (the forecast) and the transaction's own amount and time since the previous event, both known when it is scored.
+- Considered: forecasting the whole day's activity, or using the full quantile spread. Kept to a median forecast to stay simple and cheap.
+- Limitation: there is one forecast per account-day (the next event after midnight), so for the third transaction of a day the forecast is still "the first event of the day"; the checklist's same-day counts cover what happens within the day.
+
+**M34. From embeddings to tree-model columns: average the history patches, then PCA to 16 components fitted on training days only.**
+- What: Chronos-2 gives 768 numbers per 16-event patch for each of the 3 channels; TTM gives 192. Patches are averaged per channel (as in Savvidi et al. 2026) and concatenated (2,304 numbers for Chronos-2, 576 for TTM). PCA is then fitted on the training-window account-days only, with no labels, and the first 16 components are kept. Contestant C uses only the TSFM columns (16 components, 2 surprise scores, a has-history flag); contestant D uses B's columns plus those, with B's exact LightGBM settings.
+- Why average: it gives a fixed-length summary regardless of how long the history is. Why PCA: hundreds of strongly correlated numbers make tree models slow and prone to noise; 16 components keep most of the variation (the share kept is recorded in every run as `pca_variance_explained`). Why training days only: anything fitted on validation or test data would let those periods shape the inputs.
+- Considered: the [REG] summary token (Chronos-2 only, so not comparable across models); keeping all dimensions (too slow on CPU; ablated on Day 26).
+- Limitation: averaging loses the order of patches inside the history, and 16 components may drop rare patterns; both are ablation items.
+
+**M35. TTM reads a fixed 512-step window, so short histories are padded and marked as not observed.**
+- Why: TTM r2 only accepts its trained context length. Padding with zeros alone would tell the model "many free, instant transactions"; the `past_observed_mask` tells it those steps are not real data.
+- Limitation: how much the padding still influences TTM's summary is not measured; AMLWorld histories are mostly short (median 10 events in a 512 window).
+
+**M36. What runs where, given no GPU.**
+- Measured CPU cost per account-day: TTM about 2.3 to 2.9 ms; Chronos-2 about 66 ms on AMLWorld (short histories) and 283 ms on TabFormer (256 events), plus a similar cost again for its forecast.
+- So: TTM runs on the full AMLWorld main test and on the TabFormer sample; Chronos-2 runs on the 20,000-account AMLWorld sample only. Full-data Chronos-2 and full TabFormer with TTM (about 9 hours) are left out and marked as such in results.
+- Why this is still a fair test: contestant D is compared with B on exactly the same rows each time, so a sample result is a valid comparison, just with wider intervals.
+- Limitation: the Chronos-2 result rests on a 20,000-account sample (about 23 newly bad accounts on its validation day), so its interval will be wide and cannot confirm a small effect.
+
 ---
 
 ## Limitations register
@@ -208,4 +231,6 @@ The honest list. Each item says what could be wrong and what was done about it.
 | L12 | Intervals on few positives | AMLWorld validation is one day; intervals can be wide or unstable | Account-level paired bootstrap, (count + 1) / (n + 1) p-values, Holm and BH, all reported |
 | L13 | The lock does not block code edits | A person could change code between lock and test | Git history shows every edit; the agent will only reach data through the locked harness (Day 21 to 25) |
 | L15 | Full Chronos-2 embedding needs a GPU | Main TSFM results depend on one notebook run | Inputs and outputs checksummed; cache keyed by model, version, account, cutoff; CPU path for samples and TTM |
+| L16 | Chronos-2 only on a sample | Its result has wide intervals | Same rows for B and D; TTM on full data; GPU run left as future work |
+| L17 | One forecast per account-day | Later same-day transactions compare with the first-event forecast | Checklist same-day counts cover within-day activity |
 | L14 | Canary is a spot check | 8 accounts, 10 probes per run | Full past-only proofs are in the unit tests; the canary proves the checks work on the run's own data |

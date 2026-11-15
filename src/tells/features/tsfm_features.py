@@ -64,9 +64,24 @@ def compute_tsfm_cache(
     out = _cache_dir(adapter, data_sha, context, root)
     out.mkdir(parents=True, exist_ok=True)
     keys = keys.select("account_id", "day").unique().sort("account_id", "day")
-    meta = {"model": adapter.name, "version": adapter.version, "data_sha256": data_sha,
-            "context": context, "n_keys": keys.height, "chunk": chunk}  # fmt: skip
-    (out / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    meta = {
+        "model": adapter.name,
+        "version": adapter.version,
+        "revision": adapter.revision,
+        "data_sha256": data_sha,
+        "context": context,
+        "n_keys": keys.height,
+        "chunk": chunk,
+    }
+    meta_path = out / "meta.json"
+    if meta_path.exists():
+        previous = json.loads(meta_path.read_text(encoding="utf-8"))
+        if previous.get("revision", adapter.revision) != adapter.revision:
+            raise ValueError(
+                f"cache {out} was built with model revision {previous['revision']}, "
+                f"not {adapter.revision}; delete it to rebuild"
+            )
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     index = None
     n_chunks = (keys.height + chunk - 1) // chunk
     for c in range(n_chunks):

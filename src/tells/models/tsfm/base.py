@@ -31,6 +31,7 @@ class TSFMOutput:
 
 class TSFMAdapter(Protocol):
     name: str  # short id used in feature names and cache keys, e.g. "ttm"
+    revision: str  # exact model weights (Hugging Face commit)
 
     @property
     def version(self) -> str: ...  # model id plus package version, recorded in provenance

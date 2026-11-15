@@ -22,6 +22,8 @@ import numpy as np
 from tells.models.tsfm.base import CHANNEL_INDEX, FORECAST_CHANNELS, TSFMOutput
 
 MODEL_ID = "amazon/chronos-2"
+# Exact model weights (Hugging Face commit, checked 2026-11-14).
+REVISION = "29ec3766d36d6f73f0696f85560a422f50e8498c"
 D_MODEL = 768
 
 
@@ -36,7 +38,8 @@ class Chronos2Adapter:
             torch.set_num_threads(threads)
         self.context = context
         self.batch_size = batch_size
-        self._pipe = Chronos2Pipeline.from_pretrained(MODEL_ID, device_map="cpu")
+        self.revision = REVISION
+        self._pipe = Chronos2Pipeline.from_pretrained(MODEL_ID, revision=REVISION, device_map="cpu")
 
     @property
     def version(self) -> str:

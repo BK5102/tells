@@ -4,7 +4,7 @@
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
-> **Status (2026-11-14):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`) and the two baseline contestants are built and tested (135 tests). The TSFM contestants are next. Every number below is from the **validation** period, used to check the pipeline and choose the headline metric. **No test-period result exists yet**: the test period stays locked until the full plan is sealed.
+> **Status (2026-11-14):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`) and the two baseline contestants are built and tested (135 tests). The TSFM contestants C and D are built; their validation runs are in progress. Every number below is from the **validation** period, used to check the pipeline and choose the headline metric. **No test-period result exists yet**: the test period stays locked until the full plan is sealed.
 
 ## The problem in one paragraph
 
@@ -119,8 +119,10 @@ IEEE-CIS, PaySim, and Sparkov were measured and set aside: IEEE-CIS and PaySim h
 |---|---|---|---|
 | A | Lazy baseline | Rank by amount, no learning. Any model must beat this | Built |
 | B | Checklist + LightGBM | 34 past-only red-flag features (activity bursts, unusual amounts, new merchants or counterparties, money in versus out) into a gradient-boosted tree model: roughly what banks use | Built |
-| C | TSFM only | Ranking from the pretrained model's view of each account | Days 12 to 17 |
-| D | B + TSFM embedding + surprise score | Contestant B with the TSFM's summary of each account added as extra columns, same model settings | Days 12 to 17 |
+| C | TSFM only | LightGBM on the TSFM's 16-number summary of each account's history plus two surprise scores, nothing else | Built (TTM, Chronos-2) |
+| D | B + TSFM | Contestant B's columns plus the TSFM columns, with B's exact model settings, so only the inputs differ | Built (TTM, Chronos-2) |
+
+The TSFMs are [Chronos-2](https://arxiv.org/abs/2510.15821) (119.5M parameters, the model the AMLWorld paper used) and IBM's [TTM r2](https://huggingface.co/ibm-granite/granite-timeseries-ttm-r2) (0.8M parameters, a different lab and design). There is no GPU, so TTM runs on full data and Chronos-2 on the 20,000-account AMLWorld sample, where a CPU can finish (see [`docs/tsfm-notes.md`](docs/tsfm-notes.md)).
 
 Stated before testing: if the TSFM helps, the gain should be larger on AMLWorld than on TabFormer, and results will be split by history length (fewer than 16 prior events versus 16 or more).
 
@@ -200,7 +202,7 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | 1. Repo, data loaders, time split | 1 to 3 | Done |
 | 2. Scoring harness, metrics, features, bank-style model | 4 to 8 | Done |
 | 3. Lock, luck checks, canary, Cleanroom v0.1 | 9 to 11 | Done |
-| 4. TSFM contestants | 12 to 17 | Next |
+| 4. TSFM contestants | 12 to 17 | Built; validation runs in progress |
 | 5. Controls, explainability, cost | 18 to 20 | |
 | 6. Agent harness | 21 to 25 | |
 | 7. Full grid, findings, write-up | 26 to 30 | |
