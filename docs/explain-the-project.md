@@ -255,3 +255,5 @@ Where to point people: `docs/findings.md` (the full write-up), `docs/analysis/am
 **"What went wrong?"** My first TSFM result was negative because of a dataset shift and a scaling mistake; my first confidence intervals were biased; my first headline counted known-bad accounts; my first canary had a blind spot. Each was found by a check, fixed, tested, and documented.
 
 **"What would you do next?"** Run Chronos-2 on full data with a GPU, test on real data under an agreement, and try a rolling retrain so the model sees established accounts during training.
+
+**"Could your safeguards still be bypassed?"** A code review on 2026-11-16 found seven gaps, none of which changed a reported number: for example, an uncommitted lock was accepted, the agent could choose to spend the test run, and the Critic judged "better" by the interval alone instead of the multiple-comparison-corrected p-value. Each was fixed with a test that failed first (`docs/decisions.md`, 2026-11-16). One-sentence version: "I had my own guardrails reviewed and closed every gap found, with a test proving each fix."
