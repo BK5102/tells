@@ -417,9 +417,9 @@ Each account active on a day is one case. A case's score is the highest score am
 
 Each row should end in a merged commit with a test. If a day slips, drop the next "nice to have", not the test.
 
-### Status (2026-11-14)
+### Status (2026-11-16)
 
-Built and tested: Days 1 to 19, plus the AMLWorld loader (moved up from Day 27) and the label-permutation control (Day 18). Day 20 (cost) is partly covered: every run records fit, score, and TSFM time. Not done for lack of a GPU: Chronos-2 on full data (it runs on the 20,000-account AMLWorld sample instead) and TTM on full TabFormer (about 9 CPU hours, optional). Reasons for every deviation from this plan are in `docs/methodology.md` and `docs/decisions.md`.
+Built and tested: Days 1 to 25 (agent live runs need an API key). Day 26: both plans sealed; the AMLWorld test scored once (no detectable TSFM gain at the headline); full TabFormer validation and test running. Day 28: `docs/findings.md` written for AMLWorld, TabFormer section pending. Not done for lack of a GPU: Chronos-2 on full data (run on the 20,000-account AMLWorld sample instead). Deferred by the owner: live agent run, Kaggle checksum comparison, terminal recording. Reasons for every deviation are in `docs/methodology.md` and `docs/decisions.md`; the step-by-step story is in `docs/explain-the-project.md`.
 
 ### Phase 0 (done 2026-11-10): decisions and data fit
 

@@ -214,10 +214,12 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | Path | What |
 |---|---|
 | [`docs/explain-the-project.md`](docs/explain-the-project.md) | **The project as a story: every step, why, what it caused, and how to explain it in an interview.** Read this first |
+| [`docs/findings.md`](docs/findings.md) | Findings and limits: what worked, what did not, what could not be tested, next steps |
 | [`docs/methodology.md`](docs/methodology.md) | **Every choice: what, why, what else was considered, limitation.** Start here to understand the project |
 | [`docs/decisions.md`](docs/decisions.md) | Dated diary of what was built and why, in plain English with analogies |
 | [`docs/data-fit.md`](docs/data-fit.md) | Measured fit of every candidate dataset |
-| [`docs/audits/`](docs/audits/) | Leak audits with PASS / FAIL per check |
+| [`docs/audits/`](docs/audits/) | Three leak audits with PASS / FAIL per check, including one proving the test was sealed before scoring |
+| [`docs/analysis/`](docs/analysis/) | Descriptive follow-up analyses (not pre-registered), clearly labeled |
 | [`PLAN.md`](PLAN.md) | Background from zero, requirements, the 30-day plan |
 | `packages/cleanroom/` | The shared honest-exam toolkit |
 | `src/tells/` | Loaders, features, contestants, harness, evaluation |
