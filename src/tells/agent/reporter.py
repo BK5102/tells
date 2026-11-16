@@ -45,6 +45,8 @@ def build_report(result: AgentResult, critic: CriticReport, toolbox: Toolbox) ->
         lines.append(f"- `{call['tool']}` {call['input']}")
     for d in result.denied:
         lines.append(f"- denied `{d['tool']}`: {d['reason']}")
+    for e in result.errors:
+        lines.append(f"- error in `{e['tool']}`: {e['error']}")
     if result.stopped_by_budget:
         lines.append("- stopped by the tool-call budget")
     return "\n".join(lines) + "\n"

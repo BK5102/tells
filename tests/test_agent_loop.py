@@ -226,3 +226,17 @@ def test_critic_needs_the_holm_corrected_p_value_for_better(box: Toolbox) -> Non
     _rewrite_run(box, weaken)
     assert not review(FINAL, box).passed
     assert review(FINAL.replace('"better"', '"no clear difference"'), box).passed
+
+
+def test_a_tool_that_crashes_is_reported_to_the_model(box: Toolbox, tmp_path: Path) -> None:
+    # Regression: only ToolDenied was caught, so any other error ended the whole agent run.
+    class Broken(Toolbox):
+        def call(self, name, args):
+            raise ValueError("bad results file")
+
+    broken = Broken(configs_dir=box.configs_dir, runs_dir=box.runs_dir)
+    llm = CassetteLLM(_cassette(tmp_path))
+    result = run_agent("q", broken, llm)
+    assert result.final_text == FINAL  # the loop carried on to the final answer
+    assert result.errors[0] == {"tool": "load_results", "error": "ValueError: bad results file"}
+    assert len(result.errors) == 2 and result.denied == []
