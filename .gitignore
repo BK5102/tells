@@ -24,3 +24,6 @@ Thumbs.db
 .vscode/
 .idea/
 data/interim/
+
+# Temporary git worktrees made by Claude Code agents
+.claude/worktrees/
