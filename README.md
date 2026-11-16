@@ -4,7 +4,7 @@
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
-> **Status (2026-11-14):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`) and the two baseline contestants are built and tested (135 tests). The TSFM contestants C and D are built; their validation runs are in progress. Every number below is from the **validation** period, used to check the pipeline and choose the headline metric. **No test-period result exists yet**: the test period stays locked until the full plan is sealed.
+> **Status (2026-11-16):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), all four contestants (two TSFMs: TTM and Chronos-2), the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (165 tests). Every number below is from the **validation** period. **No test-period result exists yet**: the test period stays locked until the full plan is sealed.
 
 ## The problem in one paragraph
 
@@ -126,25 +126,31 @@ The TSFMs are [Chronos-2](https://arxiv.org/abs/2510.15821) (119.5M parameters, 
 
 Stated before testing: if the TSFM helps, the gain should be larger on AMLWorld than on TabFormer, and results will be split by history length (fewer than 16 prior events versus 16 or more).
 
-## Results so far (validation period only, contestants A and B)
+## Results so far (validation period only)
 
-These are development checks on the validation period, not findings: contestants C and D do not exist yet, and the test period is still locked. Numbers are copied from the run files named below.
+These are validation results, not findings. The test period is still sealed, and one setting (standardizing embeddings before PCA) was changed after seeing the first validation run, so only the test period can confirm anything. Every number is copied from the run files named below; full tables are produced by `uv run tells report <run>`.
 
-| Validation period | AMLWorld (main test), 2022-09-06 | TabFormer (long history), 2016 |
-|---|---|---|
-| Account-day cases / newly bad accounts | 224,616 / 672 | 839,604 / 556 |
-| **Headline: first-fraud-day catch** | budget 0.5% | budget 0.1% |
-| A. Lazy baseline | 2.1% | 0.7% |
-| B. Checklist + LightGBM | **31.5%** | **28.4%** |
-| B minus A, 95% interval (1,000 account resamples) | -29.5 points [-33.0, -25.9]: B is far ahead | -27.8 points [-31.5, -24.2] |
-| B at 0.5% / 1% / 5% budget | 31.5% / 46.0% / 83.0% | 90.1% / 96.0% / 99.1% |
-| B transaction PR-AUC | 0.409 | 0.842 |
-| B Brier score (base rate) | 0.00094 (0.00110) | 0.00067 (0.00209) |
-| B fit / score time on CPU | 171 s / 59 s | 706 s / 66 s |
+**Headline: share of newly bad accounts caught on their first bad day.** Differences are against contestant B, in percentage points, with 95% intervals from 1,000 account-level bootstrap resamples and Holm-corrected p-values.
 
-What this says: the bank-style model is a strong, well-calibrated baseline on card data and leaves about two thirds of new laundering accounts uncaught at a 0.5% budget, so AMLWorld is where a TSFM has room to help. On AMLWorld, B's transaction PR-AUC (0.41) is below the published graph-based models (0.74 to 0.78, [Savvidi et al. 2026](https://arxiv.org/html/2610.29667v1)), as expected for a model without graph features and on a different split.
+| | AMLWorld, full data (main test) | AMLWorld, 20,000-account sample | TabFormer, 300-card sample |
+|---|---|---|---|
+| Validation period | 2022-09-06 | 2022-09-06 | 2016 |
+| Budget / newly bad accounts | 0.5% / 672 | 0.5% / 23 | 0.1% / 29 |
+| A. Lazy baseline | 2.1% | 4.3% | 1.3% |
+| B. Checklist + LightGBM | 31.5% | 39.1% | 9.5% |
+| C. TTM only | 3.0% | 4.3% | 0.0% |
+| **D. B + TTM** | **37.2%: +5.7 [+2.3, +9.1], p 0.006** | 34.8%: -4.3 [-23.6, +11.8] | 8.7%: -0.8 [-2.2, 0.0], p 0.31 |
+| C. Chronos-2 only | not run (needs a GPU) | 4.3% | not run |
+| D. B + Chronos-2 | not run (needs a GPU) | 43.5%: +4.3 [-10.5, +18.2] | not run |
 
-Runs: `20261115T020923Z_amlworld_valid_5152975d_4396a0` (commit `b807bfb`, clean) and `20261115T021607Z_tabformer_valid_44c6db59_66d055` (commit `b807bfb`; marked as having uncommitted changes because documentation files were being edited while it started, with no code changes). Both runs passed the canary.
+What this says so far:
+
+- On full AMLWorld, adding TTM's summary of each account's history to the bank-style model caught more new laundering accounts on their first day, mostly when review slots are scarce: at a 0.1% budget it nearly doubled (15.0% against 7.9%), while at 2% and 5% it was slightly behind (64.0% against 65.2%, 80.1% against 83.0%). The gain appears for both short-history and long-history accounts (33.8% against 28.1%, and 44.2% against 38.7%), and TTM columns account for 16.5% of D's SHAP attribution.
+- TTM on its own is weak everywhere (C): it helps as a complement to the checklist, not as a replacement.
+- The two samples are too small to see an effect of this size (23 and 29 newly bad accounts; intervals 20 to 30 points wide). Chronos-2 is only on the AMLWorld sample because a CPU cannot embed the full data in reasonable time (2.7 hours for 78,686 account-days, against about 1.3 minutes for TTM).
+- Every run passed its canary, and every label-permutation control (the bank-style model trained on shuffled labels) scored like random ranking.
+
+Runs: `20261115T041547Z_amlworld_valid_f6ff26be_5e9b71`, `20261115T212743Z_amlworld_small_valid_feecada6_92f7a2`, `20261115T042711Z_small_valid_0f1dcdc6_df305f`. The first TTM run on full AMLWorld (`20261115T031830Z_amlworld_valid_f6ff26be_96919d`, before standardized PCA) made D worse (-11.6 points) and stays on record as a tried variant.
 
 ## Problems found and fixed along the way
 
@@ -156,7 +162,8 @@ These are the moments that made the evaluation more trustworthy:
 4. **A headline that counted old news.** "First fraud day" first counted accounts already known to be bad before the period: 19% of AMLWorld and 46% of TabFormer positives. Fixed to count only new catches.
 5. **A biased luck check.** The first bootstrap re-ranked each resample, so duplicated accounts competed for the same review slots and one interval did not contain its own estimate. Fixed by forming the queue once on real data; every result now reports the bootstrap mean so this bias would be visible.
 6. **A blind canary.** The first canary sample on AMLWorld had no laundering accounts, so a label leak could not be detected. The sample now always includes positive accounts, and the Cleanroom refuses a sample that cannot catch it.
-7. **A flaky CI test.** Two runs starting in the same second shared a folder on fast CI machines. Run folders now get a unique suffix and still refuse to overwrite.
+7. **A first TSFM result that came from two problems, not from the model.** The first TTM run made the bank-style model worse on AMLWorld. Two causes: PCA on raw embedding numbers was dominated by a few numbers on a huge scale, and AMLWorld's training days hold almost only brand-new accounts (9.3% with 16 or more earlier events) while the validation day is half established accounts (48.4%). Embeddings are now standardized before PCA, every run reports this history mix, and the first run is kept and counted.
+8. **A flaky CI test.** Two runs starting in the same second shared a folder on fast CI machines. Run folders now get a unique suffix and still refuse to overwrite.
 
 ## Limitations
 
@@ -202,7 +209,7 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | 1. Repo, data loaders, time split | 1 to 3 | Done |
 | 2. Scoring harness, metrics, features, bank-style model | 4 to 8 | Done |
 | 3. Lock, luck checks, canary, Cleanroom v0.1 | 9 to 11 | Done |
-| 4. TSFM contestants | 12 to 17 | Built; validation runs in progress |
-| 5. Controls, explainability, cost | 18 to 20 | |
-| 6. Agent harness | 21 to 25 | |
-| 7. Full grid, findings, write-up | 26 to 30 | |
+| 4. TSFM contestants | 12 to 17 | Done (validation) |
+| 5. Controls, explainability, cost | 18 to 20 | Done |
+| 6. Agent harness | 21 to 25 | Built; live runs need an API key |
+| 7. Seal, test, findings, write-up | 26 to 30 | Next |
