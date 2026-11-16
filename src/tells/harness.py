@@ -88,22 +88,30 @@ def split_data(
     return parts
 
 
+def checklist_cache_path(data_sha256: str, cache_dir: Path = FEATURE_CACHE) -> Path:
+    """Where the checklist features for this data and this feature code are cached."""
+    code_sha = file_sha256(checklist.__file__)
+    key = hashlib.sha256(f"{data_sha256}:{code_sha}".encode()).hexdigest()[:16]
+    return cache_dir / f"checklist_{key}.parquet"
+
+
 def checklist_features(
-    tx: pl.DataFrame, data_sha256: str, cache_dir: Path = FEATURE_CACHE
+    tx: pl.DataFrame, data_sha256: str, cache_dir: Path = FEATURE_CACHE, write: bool = True
 ) -> pl.DataFrame:
     """Build checklist features, cached by data checksum and feature-code checksum.
 
     Changing either the data or `features/checklist.py` gives a new cache key,
-    so stale features are never reused.
+    so stale features are never reused. With `write=False` a missing cache is
+    computed in memory and not saved (used by the report, which must never
+    create a cache).
     """
-    code_sha = file_sha256(checklist.__file__)
-    key = hashlib.sha256(f"{data_sha256}:{code_sha}".encode()).hexdigest()[:16]
-    path = cache_dir / f"checklist_{key}.parquet"
+    path = checklist_cache_path(data_sha256, cache_dir)
     if path.exists():
         return pl.read_parquet(path)
     feats = checklist.build_checklist_features(tx)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    feats.write_parquet(path)
+    if write:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        feats.write_parquet(path)
     return feats
 
 

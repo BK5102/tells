@@ -159,3 +159,36 @@ def test_label_permutation_control_is_consistent_with_chance(tmp_path: Path, syn
     real = s["contestants"]["B_checklist_lgbm"]["headline"]
     assert control["consistent_with_chance"] is True
     assert control["permuted_headline"] < real  # the real model learned something the noise did not
+
+
+def test_report_history_never_writes_the_feature_cache(tmp_path: Path, synthetic_tx) -> None:
+    # Regression: the report read a subset of columns and could save an
+    # incomplete feature cache that later runs would reuse.
+    from tells.report import history_table
+
+    data = tmp_path / "synthetic.parquet"
+    synthetic_tx.write_parquet(data)
+    cfg = ExperimentConfig(
+        name="hist",
+        dataset="synthetic",
+        data=data,
+        split=Split(
+            train=Window(None, datetime(2015, 1, 1)),
+            valid=Window(datetime(2015, 2, 1), datetime(2015, 8, 1)),
+            test=Window(datetime(2015, 9, 1), datetime(2016, 1, 1)),
+        ),
+        contestants=("lazy_amount",),
+        n_boot=20,
+        raw={"name": "hist", "data": str(data)},
+    )
+    run = run_experiment(cfg, runs_dir=tmp_path / "runs", cache_dir=tmp_path / "cache")
+    s = run.summary
+    empty = tmp_path / "report_cache"
+    computed = history_table(run.run_dir, s, cache_dir=empty)
+    assert not empty.exists()  # computed in memory, nothing written
+    cached = history_table(run.run_dir, s, cache_dir=tmp_path / "cache")
+    assert computed == cached  # the run's own cache gives the same table
+
+    synthetic_tx.head(100).write_parquet(data)  # the data changed since the run
+    with pytest.raises(ValueError, match="checksum"):
+        history_table(run.run_dir, s, cache_dir=empty)

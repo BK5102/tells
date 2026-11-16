@@ -234,6 +234,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why: CLAUDE.md rule 4 (numbers come from result files) is only enforceable if no person or model types a number. Limiting the agent to three narrow tools means it cannot read test labels, raw data, or anything outside the project, whatever it is asked.
 - Considered: giving the agent a Python sandbox (far more flexible, far harder to audit).
 - Limitation: the history-length split for runs made before it existed is recomputed from saved cases and data; the recomputation is tested to use the same functions as live runs.
+- Changed on 2026-11-16: the report never writes the feature cache. It reads the run's cache if one exists for that data and feature code, and otherwise builds the features in memory from every column. Before, it read a subset of columns and could save an incomplete cache (without the transfer-direction and error columns) that a later run would then reuse. It also refuses if the data file's checksum differs from the one recorded in the run.
 
 
 **M40. The agent: Claude Opus 5.5 in a loop we own, a hard tool budget, and a Critic that checks every claim.**
