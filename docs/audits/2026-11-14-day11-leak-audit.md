@@ -1,5 +1,8 @@
 # Leak audit, Day 11 (2026-11-14)
 
+> Dated record of the Day 11 audit, kept as written. Later status: the agent tool layer and its denied-label test were built (Days 21 to 25), and the configs were sealed on Day 26 (see `2026-11-16-sealed-test-audit.md`). Check 8 was updated in place when the control was built.
+
+
 Run with the leak audit prompt in `PROMPT.md` section 3. Reviewer stance: find every way the evaluation could cheat. Each check is PASS, FAIL, WARN (works, with a caveat to fix or watch), or NOT YET (the component does not exist yet). Evidence points to code and tests.
 
 | # | Check | Result | Evidence |

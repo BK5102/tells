@@ -1,6 +1,6 @@
 # Tells
 
-**Does a pretrained time series model help catch fraud and money laundering when analysts can only review a small, fixed number of cases each day?** Tells answers that with an evaluation built so no model can cheat, and every choice in it is written down with its reason and its limits.
+**Does a pretrained time series model help catch fraud and money laundering when analysts can only review a small, fixed number of cases each day?** Tells answers that with an evaluation built to catch cheating, and every choice in it is written down with its reason and its limits.
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
@@ -139,7 +139,7 @@ The plan was sealed by hash and committed before scoring (lock `f6ff26be`, commi
 | C. TTM only | 1.0% | -33.4 [-35.6, -31.2] |
 | **D. B + TTM** | **34.5%** | **+0.1 [-1.6, +1.9]** |
 
-Descriptive only (not pre-registered tests): D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level PR-AUC (0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%, 77.3% against 79.5% at 5%). Results were the same for short-history and long-history accounts.
+Descriptive only (not pre-registered tests): D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level PR-AUC (0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%, 77.3% against 79.5% at 5%). There was no clear difference in either history group (short: 32.8% against 33.6%; long: 36.2% against 35.2%; not tested).
 
 **Why this differs from validation:** on the single validation day, D was +5.7 points ahead, but that came from the second variant tried (standardizing embeddings before PCA), chosen after the first variant made D worse. The sealed test period has 2.7 times as many newly bad accounts and was untouched by any choice. It is the number that counts, and it is why the test was sealed before scoring.
 
@@ -201,7 +201,7 @@ The short list. The full register, with what was done about each, is in [`docs/m
 
 ```
 uv sync --all-packages
-uv run pytest -q                                   # 135 tests; data tests skip without data
+uv run pytest -q                                   # all tests; data and model tests skip without them
 uv run tells prepare tabformer                     # after downloading (see data/README.md)
 uv run tells prepare amlworld
 uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, about 15 seconds
@@ -219,7 +219,7 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | [`docs/decisions.md`](docs/decisions.md) | Dated diary of what was built and why, in plain English with analogies |
 | [`docs/data-fit.md`](docs/data-fit.md) | Measured fit of every candidate dataset |
 | [`docs/audits/`](docs/audits/) | Three leak audits with PASS / FAIL per check, including one proving the test was sealed before scoring |
-| [`docs/analysis/`](docs/analysis/) | Descriptive follow-up analyses (not pre-registered), clearly labeled |
+| `docs/analysis/` | Descriptive follow-up analyses (not pre-registered), generated after the TabFormer run |
 | [`PLAN.md`](PLAN.md) | Background from zero, requirements, the 30-day plan |
 | `packages/cleanroom/` | The shared honest-exam toolkit |
 | `src/tells/` | Loaders, features, contestants, harness, evaluation |

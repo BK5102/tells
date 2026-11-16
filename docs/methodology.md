@@ -25,7 +25,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Limitation: synthetic data is cleaner than reality. No result here says how a model performs at a real bank.
 
 **M4. AMLWorld HI-Small is the main test; TabFormer is the secondary, long-history test.**
-- Why AMLWorld is the main test: (1) contestant B, the bank-style model, is far from perfect on it (it caught 37% of first-day laundering at a 0.5% budget on the development sample, against about 96% of card fraud cases on TabFormer), so a TSFM gain can actually show; (2) it is the benchmark the published TSFM paper used, so results can be set next to theirs; (3) its accounts have short histories (median 9 events before the first laundering), which tests whether a pretrained model helps where a bank has little data on a customer.
+- Why AMLWorld is the main test: (1) contestant B, the bank-style model, is far from perfect on it (on the full validation day it caught 31.5% of newly bad accounts on their first day at a 0.5% budget, against about 96% of card fraud cases on TabFormer), so a TSFM gain can actually show; (2) it is the benchmark the published TSFM paper used, so results can be set next to theirs; (3) its accounts have short histories (median 9 events before the first laundering), which tests whether a pretrained model helps where a bank has little data on a customer.
 - Why TabFormer stays: it is the opposite case, cards with years of history (median 1,493 transactions before the first fraud). If the TSFM helps on one and not the other, history length is the first explanation to test.
 - Considered: IEEE-CIS, PaySim, Sparkov. Set aside after measurement (see `docs/data-fit.md`): IEEE-CIS and PaySim have no usable account histories; Sparkov is a second card simulator and adds little variety.
 - Limitation: two synthetic generators, both from IBM. Patterns specific to those generators may not transfer.
@@ -68,7 +68,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 
 **M12. Headline metric: first-fraud-day catch rate, at a 0.5% daily budget on AMLWorld and 0.1% on TabFormer.**
 - What: of the accounts that go bad for the first time in the evaluation period, the share whose first bad day lands inside that day's review budget. Accounts already labeled bad before the evaluation window are left out of this metric (they still count in plain recall): catching a known bad account again is not a new catch. On the validation periods, that excluded 161 of 833 AMLWorld accounts (19%) and 477 of 1,033 TabFormer cards (46%); the first version of the metric counted them, which overstated what it measured.
-- Why different budgets: at 0.5% the bank-style model already catches about 91% of TabFormer fraud cases, so a gain would be invisible there; 0.1% is the tightest budget available. On AMLWorld it catches about 37% at 0.5%, so 0.5% leaves room. Both were chosen on validation data, before any TSFM existed and before the lock.
+- Why different budgets: at 0.5% the bank-style model already catches about 91% of TabFormer fraud cases, so a gain would be invisible there; 0.1% is the tightest budget available. On AMLWorld it catches 31.5% of newly bad accounts on their first day at 0.5% (validation), so 0.5% leaves room.5% leaves room. Both were chosen on validation data, before any TSFM existed and before the lock.
 - Why first-fraud-day: catching an account the first day it goes bad is what stops further losses; catching it on day five, after four days of damage, is worth much less. It also avoids counting one long burst many times.
 - Why 0.5% on AMLWorld: it gives about 1,120 review slots on the validation day (224,616 cases) for 833 laundering accounts, so catching all of them is possible in principle, and the bank-style model is far from that.
 - Secondary numbers (always reported, never hidden): recall and precision at every budget, case-level and transaction-level PR-AUC, calibration, cost.
@@ -78,7 +78,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 
 **M13. Time-ordered windows with a gap: train, then validation, then test.**
 - Why: a model is used on the future, so it must be graded on the future. The gap stands in for the delay before fraud labels are known: at the moment of scoring, the most recent labels do not exist yet.
-- Validation is used to check the pipeline and choose settings; the test period is scored once, after the lock (Day 9).
+- Validation is used to check the pipeline and choose settings; the test period is scored once, after the lock (built on Day 9, used on Day 26).
 - Implemented in `cleanroom.split`, which refuses overlapping or too-close windows and re-checks the actual rows.
 
 **M14. TabFormer split: train to 2015-09, validation 2016, test 2017-04 to 2019, 90-day gaps.**
@@ -179,8 +179,8 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 
 ## 9. TSFM inputs and compute
 
-**M32. One TSFM embedding per account-day, from the history before that day began; full Chronos-2 runs on a free GPU.**
-- What: for every account-day case, the account's events strictly before midnight of that day form one sequence; its embedding is shared by all of that day's transactions. Chronos-2 embeddings for the full datasets are computed once on a free Colab GPU and cached by model, version, account, and cutoff; development, tests, and the small model run on CPU.
+**M32. One TSFM embedding per account-day, from the history before that day began; Chronos-2 only where a CPU can finish.**
+- What: for every account-day case, the account's events strictly before midnight of that day form one sequence; its embedding is shared by all of that day's transactions. Embeddings are cached by model, version, account, and cutoff. The original plan was to run Chronos-2 on full data once on a free GPU; no GPU was available, so Chronos-2 ran only on the 20,000-account AMLWorld sample and TTM on full data (M36).
 - Why per account-day: one embedding per transaction (millions) is unaffordable, and the unit being ranked is the account-day anyway. Cutting at midnight is stricter than past-only per transaction, so it cannot leak.
 - Why a GPU for this step only: measured on this laptop, Chronos-2 takes about 0.4 seconds per account at 256 events and 4 input series, so the AMLWorld validation day alone would need about a day of CPU. A GPU is typically one to two orders of magnitude faster for this kind of model (not measured here yet).
 - Considered: embedding once per account per window (cheaper, but stale within the window and empty for AMLWorld training accounts, whose data starts on day one); subsampling accounts for contestant D only (rejected: B and D must be trained on identical rows for a fair comparison).
@@ -196,7 +196,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 **M34. From embeddings to tree-model columns: average the history patches, then PCA to 16 components fitted on training days only.**
 - What: Chronos-2 gives 768 numbers per 16-event patch for each of the 3 channels; TTM gives 192. Patches are averaged per channel (as in Savvidi et al. 2026) and concatenated (2,304 numbers for Chronos-2, 576 for TTM). PCA is then fitted on the training-window account-days only, with no labels, and the first 16 components are kept. Contestant C uses only the TSFM columns (16 components, 2 surprise scores, a has-history flag); contestant D uses B's columns plus those, with B's exact LightGBM settings.
 - Why average: it gives a fixed-length summary regardless of how long the history is. Why PCA: hundreds of strongly correlated numbers make tree models slow and prone to noise; 16 components keep most of the variation (the share kept is recorded in every run as `pca_variance_explained`). Why training days only: anything fitted on validation or test data would let those periods shape the inputs.
-- Considered: the [REG] summary token (Chronos-2 only, so not comparable across models); keeping all dimensions (too slow on CPU; ablated on Day 26).
+- Considered: the [REG] summary token (Chronos-2 only, so not comparable across models); keeping all dimensions (too slow on CPU; planned as a Day 26 ablation, not run: each ablation needs a new multi-hour embedding run on CPU).
 - Changed on 2026-11-14: embedding numbers are now standardized (divided by their training-period spread) before PCA. Without it, a few TTM numbers with spreads up to 479 (median 7) took 97% of the variance, so the "16 components" were really about two directions, one of them mostly history length. The unstandardized run stays on record as a tried variant (M41).
 - Limitation: averaging loses the order of patches inside the history, and 16 components may drop rare patterns; both are ablation items.
 
@@ -206,7 +206,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 
 **M36. What runs where, given no GPU.**
 - Measured CPU cost per account-day: TTM about 2.3 to 2.9 ms; Chronos-2 about 66 ms on AMLWorld (short histories) and 283 ms on TabFormer (256 events), plus a similar cost again for its forecast.
-- So: TTM runs on the full AMLWorld main test and on the TabFormer sample; Chronos-2 runs on the 20,000-account AMLWorld sample only. Full-data Chronos-2 and full TabFormer with TTM (about 9 hours) are left out and marked as such in results.
+- So: TTM runs on the full AMLWorld main test and on the TabFormer sample; Chronos-2 runs on the 20,000-account AMLWorld sample only. Full-data Chronos-2 is left out (no GPU). Full TabFormer with TTM (about 7 CPU hours) was first left out, then sealed and run at the owner's request (lock `701e5f22`).
 - Why this is still a fair test: contestant D is compared with B on exactly the same rows each time, so a sample result is a valid comparison, just with wider intervals.
 - Limitation: the Chronos-2 result rests on a 20,000-account sample (about 23 newly bad accounts on its validation day), so its interval will be wide and cannot confirm a small effect.
 
@@ -246,7 +246,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Measured: account-days with 16 or more earlier events are 9.3% of training (Sept 1 to 4, median 1 event), 48.4% of validation (Sept 6, median 15), and 62.7% of test (Sept 8 to 10, median 20). The data begins on Sept 1, so histories can only grow.
 - Why it matters: a model learns what TSFM summaries of very short histories look like, then is graded mostly on longer ones it has rarely seen. In the first TTM run (unstandardized PCA), contestant D matched B on short-history accounts (27.9% against 28.1%) but collapsed on long-history ones (3.2% against 38.7%), which pulled its headline 11.6 points below B. The label-permutation control was consistent with chance, so this is not a leak.
 - What was done: standardized PCA (M34), and `history_mix_share_16_plus` in every run's results, so the shift is visible next to the numbers.
-- Variants tried so far on the headline (all counted for multiple-comparison purposes): TTM with unstandardized PCA (run `20261115T031830Z_amlworld_valid_f6ff26be_96919d`); TTM with standardized PCA (next run).
+- Variants tried so far on the headline (all counted for multiple-comparison purposes): TTM with unstandardized PCA (run `20261115T031830Z_amlworld_valid_f6ff26be_96919d`); TTM with standardized PCA (run `20261115T041547Z_amlworld_valid_f6ff26be_5e9b71`), which is the variant that was sealed and tested.
 - Limitation: this is a property of AMLWorld's ten-day span, and no training-window choice removes it. Results on AMLWorld must be read as "TSFM features learned on new accounts, applied to established ones". TabFormer, with decades of history in training, does not have this problem.
 
 ---
@@ -258,7 +258,7 @@ The honest list. Each item says what could be wrong and what was done about it.
 | # | Limitation | Effect | What was done |
 |---|---|---|---|
 | L1 | Synthetic data only | Results do not show real-bank performance | Stated everywhere; two different generators |
-| L2 | Both datasets come from IBM generators | Generator quirks may drive results | Measured fit, found and removed the AMLWorld tail artifact; time-shuffled control planned (Day 18) |
+| L2 | Both datasets come from IBM generators | Generator quirks may drive results | Measured fit, found and removed the AMLWorld tail artifact; label-permutation control on every run (M37); a time-shuffled variant was deferred |
 | L3 | AMLWorld usable span is ten days | One-day gaps, one-day validation, short histories | Stated; intervals will be wide and are reported |
 | L4 | AMLWorld data from a mirror | Source not yet confirmed against Kaggle | Row counts match the paper; checksum comparison planned |
 | L5 | TabFormer fraud is easy for the checklist model | Ceiling effect hides gains at loose budgets | Tighter 0.1% budget; first-fraud-day headline; AMLWorld as main test |
@@ -269,9 +269,9 @@ The honest list. Each item says what could be wrong and what was done about it.
 | L10 | Both sides of a laundering transfer are labeled | Unwitting counterparties count as positives | Dataset limitation; stated |
 | L11 | Headline chosen on validation data | Choosing the budget could favor some model | Chosen before any TSFM existed and before the lock; all budgets reported |
 | L12 | Intervals on few positives | AMLWorld validation is one day; intervals can be wide or unstable | Account-level paired bootstrap, (count + 1) / (n + 1) p-values, Holm and BH, all reported |
-| L13 | The lock does not block code edits | A person could change code between lock and test | Git history shows every edit; the agent will only reach data through the locked harness (Day 21 to 25) |
+| L13 | The lock does not block code edits | A person could change code between lock and test | Git history shows every edit; the agent reaches data only through the three-tool layer and the locked harness (built, Days 21 to 25). The lock hashes the config file, not the code: settings that live in code (for example PCA standardization) are pinned by the git commit stamped on each run |
+| L14 | Canary is a spot check | 8 accounts, 10 probes per run | Full past-only proofs are in the unit tests; the canary proves the checks work on the run's own data |
 | L15 | Full Chronos-2 embedding needs a GPU | Main TSFM results depend on one notebook run | Inputs and outputs checksummed; cache keyed by model, version, account, cutoff; CPU path for samples and TTM |
 | L16 | Chronos-2 only on a sample | Its result has wide intervals | Same rows for B and D; TTM on full data; GPU run left as future work |
 | L17 | One forecast per account-day | Later same-day transactions compare with the first-event forecast | Checklist same-day counts cover within-day activity |
 | L18 | AMLWorld history shift between training and evaluation | TSFM summaries in evaluation look unlike those in training | Measured and reported per run (M41); standardized PCA; TabFormer as the counter-case |
-| L14 | Canary is a spot check | 8 accounts, 10 probes per run | Full past-only proofs are in the unit tests; the canary proves the checks work on the run's own data |

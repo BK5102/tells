@@ -8,8 +8,8 @@ Numbers below come from `scripts/check_data_fit.py` unless marked "reported". "P
 
 | Dataset | Access | Measured? | Accounts | Span | Positive rate | Prior events before first positive (median) | Verdict |
 |---|---|---|---|---|---|---|---|
-| IBM TabFormer credit card | Free, no account (GitHub LFS) | Yes | 6,139 cards, 2,000 users | 1991 to 2020 | 0.122% of transactions | 1,493 | **Primary.** Fits the idea best. |
-| AMLWorld HI-Small | Free Kaggle account | Yes (Hugging Face mirror, row count matches the paper) | 515,088 | 10 usable days | 0.102% of transactions | 9 | **Second dataset.** Thin history, but it is the benchmark the TSFM paper used. |
+| IBM TabFormer credit card | Free, no account (GitHub LFS) | Yes | 6,139 cards, 2,000 users | 1991 to 2020 | 0.122% of transactions | 1,493 | **Long-history test.** Fits the idea best, but the bank-style model is near the ceiling here (methodology M4). |
+| AMLWorld HI-Small | Free Kaggle account | Yes (Hugging Face mirror, row count matches the paper) | 515,088 | 10 usable days | 0.102% of transactions | 9 | **Main test.** Thin history, but the bank-style model is far from perfect here and it is the benchmark the TSFM paper used (methodology M4). |
 | Sparkov (Kaggle "fraud-detection") | Free Kaggle account | No. The only public mirror found was truncated at 1,048,576 rows with rounded card numbers, so it was discarded | about 1,000 cards (reported) | 2019 to 2020 (reported) | not measured | not measured | **Set aside.** Likely fits, but a second card simulator adds little variety next to TabFormer. |
 | IEEE-CIS Fraud Detection | Free Kaggle account, accept competition rules | Yes (Hugging Face mirror, 590,540 rows, matching the official count) | 199,070 reconstructed ids | 181 days | 3.5% of transactions | 0 | **Not recommended for Tells.** No usable account histories, and labels are copied forward. |
 | PaySim | Free Kaggle account | Yes (Hugging Face mirror, 6,362,620 rows) | 6,353,307 | 30 days | 0.129% | 0 | **Dropped.** 99.9% of accounts appear exactly once. |
@@ -33,13 +33,13 @@ Checksums: `transactions.tgz` sha256 `e9f589a0958f40d60f81b1a2e8428db86e00c05755
 
 ## AMLWorld HI-Small (second dataset)
 
-Source: [Altman et al. 2023, NeurIPS Datasets and Benchmarks](https://arxiv.org/abs/2306.16424), Kaggle "IBM Transactions for Anti Money Laundering". Measured here on the Hugging Face mirror `OsamaMIT/IBM-AML-HI-Small`, whose row count (5,078,345) and account count (515,088) match Table 1 of [Savvidi et al. 2026](https://arxiv.org/html/2610.29667v1). Re-download from Kaggle on Day 27 and compare checksums. Mirror sha256: `b19d39f515523373f991b689c07e11e7b0b95c17a2c27a87d91584ae16c5b040`.
+Source: [Altman et al. 2023, NeurIPS Datasets and Benchmarks](https://arxiv.org/abs/2306.16424), Kaggle "IBM Transactions for Anti Money Laundering". Measured here on the Hugging Face mirror `OsamaMIT/IBM-AML-HI-Small`, whose row count (5,078,345) and account count (515,088) match Table 1 of [Savvidi et al. 2026](https://arxiv.org/html/2610.29667v1). Comparing with the official Kaggle file's checksum is deferred by the owner; until then all AMLWorld results come from this mirror. Mirror sha256: `b19d39f515523373f991b689c07e11e7b0b95c17a2c27a87d91584ae16c5b040`.
 
 Each transaction is counted in both the sender's and receiver's history (10,156,690 account events). Median 6 events per account; 38.1% of accounts have at least 16. Of the 6,357 accounts with any laundering, the median had 9 prior events and 36.7% had at least 16.
 
 Traps found:
 
-1. **End-of-data tail.** After 2022-09-10, only 2,216 transactions remain and 1,310 of them are laundering (about 60%, against about 0.1% before). This is a generator artifact. A test period at the end of the data would let a model score well by learning "late timestamp means laundering". **Truncate to 2022-09-01 through 2022-09-10** before splitting.
+1. **End-of-data tail.** After 2022-09-10, only 2,216 account events remain (1,108 transfers, each counted for sender and receiver) and 1,310 of those events are laundering (about 60%, against about 0.1% before). This is a generator artifact. A test period at the end of the data would let a model score well by learning "late timestamp means laundering". **Truncate to 2022-09-01 through 2022-09-10** before splitting.
 2. **Only 10 usable days.** The gap must be measured in hours, not weeks, and the test period is 2 to 3 days. Bootstrap by account, not by day.
 3. **Weekly pattern.** Weekend days have about 40% of weekday volume. Do not let the test period be all weekend.
 4. **Label unit.** Labels are per transaction. The TSFM paper scores transactions; Tells also reports account-day cases (see `docs/decisions.md`).

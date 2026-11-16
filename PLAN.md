@@ -373,7 +373,7 @@ Never commit raw data to git. Store download scripts and checksums instead. Run 
 
 ### Scoring unit
 
-Each account active on a day is one case. A case's score is the highest score among its transactions that day, and its label is 1 if any of them is labeled. The review budget is a share of each day's cases (0.1%, 0.5%, 1%, 2%, 5%). The headline metric is the first-fraud-day catch rate at a 0.5% daily budget; every other metric is reported next to it. Transaction-level PR-AUC is also reported for comparison with published AMLWorld results. Reasons for every choice: `docs/methodology.md`.
+Each account active on a day is one case. A case's score is the highest score among its transactions that day, and its label is 1 if any of them is labeled. The review budget is a share of each day's cases (0.1%, 0.5%, 1%, 2%, 5%). The headline metric is the first-fraud-day catch rate at a 0.5% daily budget on AMLWorld and 0.1% on TabFormer; every other metric is reported next to it. Transaction-level PR-AUC is also reported for comparison with published AMLWorld results. Reasons for every choice: `docs/methodology.md`.
 
 ### Evaluation protocol
 
@@ -381,7 +381,7 @@ Each account active on a day is one case. A case's score is the highest score am
 2. Lock the config hash.
 3. Run all four contestants on identical splits and identical review budgets (for example 0.5, 1, 2, and 5 percent of accounts).
 4. Report recall at each budget with bootstrap intervals, calibration, and cost.
-5. Run the canary and a time-shuffled control. The shuffled control should destroy the signal. If it does not, something leaks.
+5. Run the canary and a label-permutation control (the reference model trained on shuffled labels must score like random ranking). If it does not, something leaks. (Originally planned as a time-shuffled control; see methodology M37.)
 6. Apply multiple-comparison correction across every contestant and variant tried, and report the count.
 7. Report results per test period as well as pooled, because TabFormer's fraud rate swings a lot from year to year.
 8. Report negative results as clearly as positive ones.
@@ -423,7 +423,7 @@ Built and tested: Days 1 to 25 (agent live runs need an API key). Day 26: both p
 
 ### Phase 0 (done 2026-11-10): decisions and data fit
 
-Decisions D1 to D5 in `docs/decisions.md`; reasons for every method in `docs/methodology.md`; measured dataset fit in `docs/data-fit.md`; `scripts/check_data_fit.py`; repo at https://github.com/BK5102/tells. Owner actions still to do before they are needed: a free Kaggle account for the official AMLWorld download (Day 27) and an Anthropic API key in `.env` (Day 22).
+Decisions D1 to D5 in `docs/decisions.md`; reasons for every method in `docs/methodology.md`; measured dataset fit in `docs/data-fit.md`; `scripts/check_data_fit.py`; repo at https://github.com/BK5102/tells. Owner actions deferred by the owner: a free Kaggle account for the official AMLWorld checksum comparison, and an Anthropic API key for a live agent run.
 
 ### Days 1 to 11: build the Cleanroom (the shared package)
 

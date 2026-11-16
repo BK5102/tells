@@ -52,7 +52,7 @@ The Cleanroom (`packages/cleanroom`, imported as `cleanroom`) is shared with the
 
 Measured fit for every candidate dataset is in `docs/data-fit.md`. Main test: AMLWorld HI-Small, truncated to 2022-09-01 through 2022-09-10 (the data after that is about 60% laundering, a generator artifact), because the bank-style model is far from perfect there and the published TSFM paper used it. Secondary, long-history test: IBM TabFormer credit card transactions. Reasons: `docs/methodology.md` M4. No other datasets are used. Sparkov, IEEE-CIS, and PaySim were evaluated and set aside (see the ranking in `docs/data-fit.md`); do not add loaders for them.
 
-The review budget applies to account-day cases (one case per account per active day; score is the max transaction score that day; label is 1 if any transaction that day is positive), as a share of each day's cases: 0.1%, 0.5%, 1%, 2%, 5%. **Headline metric: first-fraud-day catch rate at a 0.5% daily budget**, set in every config under `headline:`. All other metrics are always reported next to it. See `docs/methodology.md` M10 to M12.
+The review budget applies to account-day cases (one case per account per active day; score is the max transaction score that day; label is 1 if any transaction that day is positive), as a share of each day's cases: 0.1%, 0.5%, 1%, 2%, 5%. **Headline metric: first-fraud-day catch rate**, at a 0.5% daily budget on AMLWorld and 0.1% on TabFormer (near the ceiling at 0.5%), set in every config under `headline:`. All other metrics are always reported next to it. See `docs/methodology.md` M10 to M12.
 
 ## Commands
 
@@ -65,7 +65,7 @@ uv run tells prepare amlworld              # raw CSV -> data/interim/*.parquet (
 uv run pytest -q -m data                  # tests that need the prepared data (skipped in CI)
 uv run ruff check . && uv run ruff format --check .
 uv run tells run configs/small.yaml       # 300-card experiment on the validation period, about 30 s
-uv run tells run configs/tabformer.yaml   # full TabFormer, validation period (test is locked until Day 9)
+uv run tells run configs/tabformer.yaml   # full TabFormer, validation period (test period: sealed; scoring it again needs a new lock)
 uv run tells run configs/amlworld_small.yaml  # 20,000-account AMLWorld sample, seconds
 uv run tells run configs/amlworld.yaml    # full AMLWorld (the main test), validation period
 uv run tells agent "does a longer history window help?"
