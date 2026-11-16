@@ -86,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
     ag.add_argument("--cassette", type=Path, default=None, help="replay (or record) responses here")
     ag.add_argument("--record", action="store_true", help="call Claude and save to --cassette")
     ag.add_argument("--max-tool-calls", type=int, default=10)
+    ag.add_argument(
+        "--allow-test",
+        action="store_true",
+        help="let the agent score the sealed test period (still needs a committed lock)",
+    )
     ag.add_argument("--out", type=Path, default=Path("artifacts/agent_report.md"))
 
     args = parser.parse_args(argv)
@@ -102,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
             llm = CassetteLLM(args.cassette, mode="record", backend=AnthropicLLM())
         else:
             llm = AnthropicLLM()
-        box = Toolbox()
+        box = Toolbox(allow_test=args.allow_test)
         result = run_agent(args.question, box, llm, max_tool_calls=args.max_tool_calls)
         critic = review(result.final_text, box)
         args.out.parent.mkdir(parents=True, exist_ok=True)
