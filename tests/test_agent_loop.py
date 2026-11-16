@@ -53,6 +53,7 @@ def _summary() -> dict:
         },
         "comparisons": {
             "reference": "B_checklist_lgbm",
+            "metric": "first_day_recall",  # as written by compare_to_reference
             "results": {
                 "D_checklist_tsfm_ttm": {
                     "diff": 0.05,
@@ -67,7 +68,7 @@ def _summary() -> dict:
 
 FINAL = (
     "The checklist-plus-TSFM model (D_checklist_tsfm_ttm) ranked newly bad accounts higher "
-    f"than the bank-style model in run {RUN_ID}; see the headline table. This rests on one "
+    f"than the bank-style model in run {RUN_ID}; see the headline table. This rests on a single "
     "validation day and does not show test-period performance.\n"
     + json.dumps(
         {
@@ -165,3 +166,63 @@ def test_replay_rejects_a_changed_prompt(tmp_path: Path) -> None:
     llm = CassetteLLM(path)
     with pytest.raises(RuntimeError, match="differs from the recording"):
         llm.create(system=SYSTEM, messages=[{"role": "user", "content": "changed"}], tools=[])
+
+
+def _rewrite_run(box: Toolbox, change) -> None:
+    path = box.runs_dir / RUN_ID / "results.json"
+    s = json.loads(path.read_text(encoding="utf-8"))
+    change(s)
+    path.write_text(json.dumps(s), encoding="utf-8")
+
+
+def test_narrative_is_cut_at_the_summary_line_not_inside_it(box: Toolbox, tmp_path: Path) -> None:
+    # Regression: cutting at the last "{" landed inside the nested claims, so
+    # the start of the JSON summary ended up in the narrative.
+    from tells.agent.critic import split_tail
+
+    prose, tail = split_tail(FINAL)
+    assert prose == FINAL.splitlines()[0]
+    assert tail is not None and tail["runs"] == [RUN_ID]
+    result = run_agent("q", box, CassetteLLM(_cassette(tmp_path)))
+    narrative = build_report(result, review(result.final_text, box), box).split("## Numbers")[0]
+    assert '"claims"' not in narrative and '"runs"' not in narrative
+
+
+def test_critic_allows_contestant_names_with_capitals_and_digits(box: Toolbox) -> None:
+    # Regression: only lowercase names were stripped, so an honest answer
+    # naming D_checklist_tsfm_chronos2 failed the typed-number check.
+    def add_chronos(s: dict) -> None:
+        s["contestants"]["D_checklist_tsfm_chronos2"] = s["contestants"]["D_checklist_tsfm_ttm"]
+
+    _rewrite_run(box, add_chronos)
+    text = FINAL.replace(
+        "(D_checklist_tsfm_ttm)", "(D_checklist_tsfm_ttm, like D_checklist_tsfm_chronos2)"
+    )
+    report = review(text, box)
+    assert report.passed, report.checks
+
+
+@pytest.mark.parametrize(
+    "phrase", ["about two thirds of them", "roughly Half", "it doubled", "a 35 point gain"]
+)
+def test_critic_rejects_spelled_out_and_typed_numbers(box: Toolbox, phrase: str) -> None:
+    report = review(FINAL.replace("see the headline table", phrase), box)
+    assert any(c["check"] == "no typed numbers" and not c["ok"] for c in report.checks)
+
+
+def test_critic_rejects_a_claim_on_a_metric_the_run_did_not_test(box: Toolbox) -> None:
+    report = review(FINAL.replace('"metric": "first_day_recall"', '"metric": "recall"'), box)
+    failed = [c for c in report.checks if not c["ok"]]
+    assert [c["check"] for c in failed] == [f"claim metric: D_checklist_tsfm_ttm in {RUN_ID}"]
+    assert "only tested 'first_day_recall'" in failed[0]["detail"]
+
+
+def test_critic_needs_the_holm_corrected_p_value_for_better(box: Toolbox) -> None:
+    # The interval alone excludes zero here, but after correcting for the
+    # number of comparisons the difference is not significant.
+    def weaken(s: dict) -> None:
+        s["comparisons"]["results"]["D_checklist_tsfm_ttm"]["p_holm"] = 0.2
+
+    _rewrite_run(box, weaken)
+    assert not review(FINAL, box).passed
+    assert review(FINAL.replace('"better"', '"no clear difference"'), box).passed

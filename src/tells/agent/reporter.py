@@ -7,17 +7,15 @@ no typed numbers. The document says it is a draft for human review.
 
 from __future__ import annotations
 
-from tells.agent.critic import CriticReport, _parse_tail_json
+from tells.agent.critic import CriticReport, split_tail
 from tells.agent.runner import AgentResult
 from tells.agent.tools import Toolbox
 from tells.report import render
 
 
 def build_report(result: AgentResult, critic: CriticReport, toolbox: Toolbox) -> str:
-    tail = _parse_tail_json(result.final_text) or {}
-    prose = result.final_text
-    if tail:
-        prose = prose[: prose.rstrip().rfind("{")].rstrip()
+    prose, tail = split_tail(result.final_text)
+    tail = tail or {}
     lines = [
         "# Agent report (draft for human review)",
         "",

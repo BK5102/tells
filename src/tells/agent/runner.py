@@ -26,7 +26,8 @@ finished run), and plot (chart data). Prefer load_results on existing runs befor
 starting new ones, because runs take minutes to hours.
 
 Rules for your final answer:
-- Never write a number yourself. Refer to results only by run id and metric name, for \
+- Never write a number yourself, in digits or in words ("two", "half", "doubled"). \
+Refer to results only by run id and metric name, for \
 example "headline of D_checklist_tsfm_ttm in run <run_id>". A report generator inserts \
 every number from the result files.
 - Say what the evidence does and does not show, including results where the TSFM did not \
