@@ -1,0 +1,61 @@
+{
+  "config_hash": "f6ff26be18728b72ba7afbb8a1bbcca83ee9b85a0fe0f9281a37f510686297fc",
+  "sealed_utc": "2026-11-16T19:06:09.004090+00:00",
+  "git": {
+    "commit": "e77fffe85ad6a353768edb20b277bfae3f816b0e",
+    "dirty": false
+  },
+  "note": "Sealed 2026-11-16 after validation. Variants tried on full AMLWorld validation: 2 (TTM with raw PCA, D -11.6 points; TTM with standardized PCA, D +5.7 points [+2.3, +9.1]). Frozen: split, 0.5% first-fraud-day headline, contestants A, B, C and D with TTM, standardized PCA with 16 components, context 256, label-permutation control. Test period 2022-09-08 to 2022-09-10 to be scored once.",
+  "config": {
+    "bootstrap": {
+      "n_boot": 1000
+    },
+    "budgets": [
+      0.001,
+      0.005,
+      0.01,
+      0.02,
+      0.05
+    ],
+    "contestants": [
+      "lazy_amount",
+      "lgbm_checklist",
+      "tsfm_only:ttm",
+      "checklist_tsfm:ttm"
+    ],
+    "controls": [
+      "label_permutation"
+    ],
+    "data": "data/interim/amlworld.parquet",
+    "dataset": "amlworld",
+    "headline": {
+      "budget": 0.005,
+      "metric": "first_day_recall"
+    },
+    "model": {
+      "tsfm": {
+        "chunk": 50000,
+        "context": 256,
+        "pca_components": 16
+      }
+    },
+    "name": "amlworld",
+    "reference": "lgbm_checklist",
+    "seed": 0,
+    "split": {
+      "min_gap_days": 1,
+      "test": {
+        "end": "2022-09-11",
+        "start": "2022-09-08"
+      },
+      "train": {
+        "end": "2022-09-05",
+        "start": null
+      },
+      "valid": {
+        "end": "2022-09-07",
+        "start": "2022-09-06"
+      }
+    }
+  }
+}

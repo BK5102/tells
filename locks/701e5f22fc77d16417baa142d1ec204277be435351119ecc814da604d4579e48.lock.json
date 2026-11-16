@@ -1,0 +1,60 @@
+{
+  "config_hash": "701e5f22fc77d16417baa142d1ec204277be435351119ecc814da604d4579e48",
+  "sealed_utc": "2026-11-16T19:06:16.723424+00:00",
+  "git": {
+    "commit": "e77fffe85ad6a353768edb20b277bfae3f816b0e",
+    "dirty": false
+  },
+  "note": "Sealed 2026-11-16 before any full-data TSFM run on TabFormer. Variants tried: on the 300-card sample only (TTM standardized PCA: D -0.8 points [-2.2, 0.0]). Frozen: split (train to 2015-09, valid 2016, test 2017-04 to 2019), 0.1% first-fraud-day headline, contestants A, B, C and D with TTM, standardized PCA with 16 components, context 256, label-permutation control.",
+  "config": {
+    "bootstrap": {
+      "n_boot": 1000
+    },
+    "budgets": [
+      0.001,
+      0.005,
+      0.01,
+      0.02,
+      0.05
+    ],
+    "contestants": [
+      "lazy_amount",
+      "lgbm_checklist",
+      "tsfm_only:ttm",
+      "checklist_tsfm:ttm"
+    ],
+    "controls": [
+      "label_permutation"
+    ],
+    "data": "data/interim/tabformer.parquet",
+    "dataset": "tabformer",
+    "headline": {
+      "budget": 0.001,
+      "metric": "first_day_recall"
+    },
+    "model": {
+      "tsfm": {
+        "chunk": 50000,
+        "context": 256,
+        "pca_components": 16
+      }
+    },
+    "reference": "lgbm_checklist",
+    "seed": 0,
+    "split": {
+      "min_gap_days": 90,
+      "test": {
+        "end": "2020-01-01",
+        "start": "2017-04-01"
+      },
+      "train": {
+        "end": "2015-10-01",
+        "start": null
+      },
+      "valid": {
+        "end": "2017-01-01",
+        "start": "2016-01-01"
+      }
+    }
+  }
+}
