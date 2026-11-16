@@ -88,6 +88,7 @@ If a command above does not exist yet, create it as part of the day's task and u
 11. **Correct for many comparisons.** When more than one contestant or variant is compared, apply the Cleanroom's multiple-comparison correction and report how many variants were tried.
 12. **Past labels are not free.** A fraud label is only known after review. Never use an account's earlier labels as a feature unless a realistic label delay is applied and tested.
 13. **Every choice is explained.** Any new method, variable, threshold, default, or dataset choice gets an entry in `docs/methodology.md` (what, why, what else was considered, limitation) in the same commit, and any new limitation goes in its limitations register. The owner must be able to defend every choice in an interview.
+14. **Keep the story current.** After every step that changes the project or produces a result, update `docs/explain-the-project.md`: what was done, why, what else was considered, cause and effect, and a one-sentence way to say it in an interview.
 
 ## Agent safety rules (for the agent code in `src/tells/agent/`)
 

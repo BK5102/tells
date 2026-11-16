@@ -4,7 +4,7 @@
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
-> **Status (2026-11-16):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), all four contestants (two TSFMs: TTM and Chronos-2), the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (165 tests). Every number below is from the **validation** period. **No test-period result exists yet**: the test period stays locked until the full plan is sealed.
+> **Status (2026-11-16):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), all four contestants (two TSFMs: TTM and Chronos-2), the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (165 tests). The AMLWorld test period has been scored once under a sealed plan; its result is below. The TabFormer test is sealed and running.
 
 ## The problem in one paragraph
 
@@ -126,7 +126,28 @@ The TSFMs are [Chronos-2](https://arxiv.org/abs/2510.15821) (119.5M parameters, 
 
 Stated before testing: if the TSFM helps, the gain should be larger on AMLWorld than on TabFormer, and results will be split by history length (fewer than 16 prior events versus 16 or more).
 
-## Results so far (validation period only)
+## Main result: sealed AMLWorld test
+
+**On the sealed AMLWorld test period, adding a time series foundation model (TTM) to the bank-style model did not catch more newly bad accounts on their first bad day at a 0.5% daily review budget: 34.5% against 34.4%, a difference of +0.1 points (95% interval -1.6 to +1.9, Holm-corrected p 0.94), across 1,798 newly bad accounts.**
+
+The plan was sealed by hash and committed before scoring (lock `f6ff26be`, commit `4a21200`), and this was test run number 1. The canary passed, and the bank-style model retrained on shuffled labels scored like random ranking (+0.1 points, interval -0.2 to +0.4), so there is no sign of leakage.
+
+| Sealed test, 2022-09-08 to 2022-09-10 | First-fraud-day catch at 0.5% | Difference vs B [95% interval] |
+|---|---|---|
+| A. Lazy baseline | 1.6% | -32.8 [-35.0, -30.7] |
+| B. Checklist + LightGBM | 34.4% | reference |
+| C. TTM only | 1.0% | -33.4 [-35.6, -31.2] |
+| **D. B + TTM** | **34.5%** | **+0.1 [-1.6, +1.9]** |
+
+Descriptive only (not pre-registered tests): D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level PR-AUC (0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%, 77.3% against 79.5% at 5%). Results were the same for short-history and long-history accounts.
+
+**Why this differs from validation:** on the single validation day, D was +5.7 points ahead, but that came from the second variant tried (standardizing embeddings before PCA), chosen after the first variant made D worse. The sealed test period has 2.7 times as many newly bad accounts and was untouched by any choice. It is the number that counts, and it is why the test was sealed before scoring.
+
+Run: `20261116T190641Z_amlworld_test_f6ff26be_ac67fd`. Full tables: `uv run tells report artifacts/runs/20261116T190641Z_amlworld_test_f6ff26be_ac67fd`.
+
+The long-history test (full TabFormer with TTM) is sealed and running (about 9 CPU hours of embedding).
+
+## Validation results (before sealing)
 
 These are validation results, not findings. The test period is still sealed, and one setting (standardizing embeddings before PCA) was changed after seeing the first validation run, so only the test period can confirm anything. Every number is copied from the run files named below; full tables are produced by `uv run tells report <run>`.
 
@@ -192,6 +213,7 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 
 | Path | What |
 |---|---|
+| [`docs/explain-the-project.md`](docs/explain-the-project.md) | **The project as a story: every step, why, what it caused, and how to explain it in an interview.** Read this first |
 | [`docs/methodology.md`](docs/methodology.md) | **Every choice: what, why, what else was considered, limitation.** Start here to understand the project |
 | [`docs/decisions.md`](docs/decisions.md) | Dated diary of what was built and why, in plain English with analogies |
 | [`docs/data-fit.md`](docs/data-fit.md) | Measured fit of every candidate dataset |
@@ -212,4 +234,4 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | 4. TSFM contestants | 12 to 17 | Done (validation) |
 | 5. Controls, explainability, cost | 18 to 20 | Done |
 | 6. Agent harness | 21 to 25 | Built; live runs need an API key |
-| 7. Seal, test, findings, write-up | 26 to 30 | Next |
+| 7. Seal, test, findings, write-up | 26 to 30 | AMLWorld test done; TabFormer test running |
