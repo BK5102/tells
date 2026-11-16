@@ -175,7 +175,7 @@ def tsfm_features(
         t0 = time.perf_counter()
         cache = compute_tsfm_cache(adapter, tx, keys, data_sha, context, chunk, root)
         mean, scale, components, explained = fit_pca(cache, train_days, k, standardize)
-        table = load_tsfm_table(cache, model, mean, scale, components)
+        table = load_tsfm_table(cache, model, mean, scale, components, expected=keys)
         tx = add_tsfm_features(tx, table, model)
         info[model] = {
             "version": adapter.version,
