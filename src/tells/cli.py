@@ -122,11 +122,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "lock":
         from cleanroom.lock import seal
+        from cleanroom.provenance import file_sha256
 
         from tells.config import load_config
         from tells.harness import LOCKS_DIR
 
-        sealed = seal(load_config(args.config).raw, LOCKS_DIR, note=args.note)
+        cfg = load_config(args.config)
+        # Pin the data file too, so the sealed plan cannot be scored on other data.
+        sealed = seal(cfg.raw, LOCKS_DIR, note=args.note, data_sha256=file_sha256(cfg.data))
         print(f"sealed {args.config} as {sealed.path}. Commit this file before scoring the test.")
         return 0
     if args.command == "run":

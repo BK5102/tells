@@ -52,3 +52,16 @@ def test_every_use_is_recorded(tmp_path: Path) -> None:
     lock.record_use("run-1", git_commit="abc")
     lock.record_use("run-2", git_commit="abc")
     assert [u["run_id"] for u in lock.uses()] == ["run-1", "run-2"]
+
+
+def test_a_pinned_data_checksum_must_match(tmp_path: Path) -> None:
+    seal(CFG, tmp_path, data_sha256="a" * 64)
+    assert require_lock(CFG, tmp_path, data_sha256="a" * 64)
+    assert require_lock(CFG, tmp_path)  # callers that do not pass a checksum still work
+    with pytest.raises(LockMissingError, match="data checksum"):
+        require_lock(CFG, tmp_path, data_sha256="b" * 64)
+
+
+def test_a_lock_without_a_data_checksum_accepts_any_data(tmp_path: Path) -> None:
+    seal(CFG, tmp_path)
+    assert require_lock(CFG, tmp_path, data_sha256="b" * 64)

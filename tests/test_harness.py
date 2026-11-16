@@ -46,15 +46,82 @@ def test_test_scoring_after_lock_is_recorded(tmp_path: Path) -> None:
     cfg = _config(tmp_path)
     cfg = ExperimentConfig(**{**cfg.__dict__, "raw": {"name": "tiny", "v": 1}})
     lock = seal(cfg.raw, tmp_path / "locks")
+    # tmp_path is not a git repo, so the lock cannot be tracked; unit tests only.
     kw = dict(
-        runs_dir=tmp_path / "runs", cache_dir=tmp_path / "cache", locks_dir=tmp_path / "locks"
+        runs_dir=tmp_path / "runs",
+        cache_dir=tmp_path / "cache",
+        locks_dir=tmp_path / "locks",
+        allow_untracked_lock_for_tests=True,
     )
     first = run_experiment(cfg, part="test", **kw)
     second = run_experiment(cfg, part="test", **kw)
     assert first.summary["lock"]["test_run_number"] == 1
     assert second.summary["lock"]["test_run_number"] == 2
-    assert len(lock.uses()) == 2
+    # Each run records "started" before scoring and "finished" after.
+    assert [u["status"] for u in lock.uses()] == ["started", "finished"] * 2
     assert first.summary["positives"]["test"] >= 0  # labels available only after the lock
+
+
+def test_crashed_and_legacy_test_runs_still_count(tmp_path: Path) -> None:
+    from cleanroom.lock import seal
+
+    cfg = _config(tmp_path)
+    cfg = ExperimentConfig(**{**cfg.__dict__, "raw": {"name": "tiny", "v": 2}})
+    lock = seal(cfg.raw, tmp_path / "locks")
+    lock.record_use("old-run", git_commit="abc")  # written before statuses existed
+    lock.record_use("crashed-run", status="started", git_commit="abc")  # never finished
+    run = run_experiment(
+        cfg,
+        part="test",
+        runs_dir=tmp_path / "runs",
+        cache_dir=tmp_path / "cache",
+        locks_dir=tmp_path / "locks",
+        allow_untracked_lock_for_tests=True,
+    )
+    assert run.summary["lock"]["test_run_number"] == 3
+
+
+def test_test_scoring_refused_with_an_untracked_lock_or_dirty_code(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # Regression: an uncommitted lock proves nothing about when the plan was fixed.
+    from cleanroom.lock import seal
+
+    import tells.harness as harness
+
+    cfg = _config(tmp_path)
+    cfg = ExperimentConfig(**{**cfg.__dict__, "raw": {"name": "tiny", "v": 3}})
+    lock = seal(cfg.raw, tmp_path / "locks")
+    kw = dict(runs_dir=tmp_path / "runs", cache_dir=tmp_path / "cache", locks_dir=lock.path.parent)
+    monkeypatch.setattr(harness, "_git_state", lambda: {"commit": "a" * 40, "dirty": False})
+    monkeypatch.setattr(harness, "_is_tracked", lambda path: False)
+    with pytest.raises(ScoringLockedError, match="not committed"):
+        run_experiment(cfg, part="test", **kw)
+    monkeypatch.setattr(harness, "_is_tracked", lambda path: True)
+    monkeypatch.setattr(harness, "_git_state", lambda: {"commit": "a" * 40, "dirty": True})
+    with pytest.raises(ScoringLockedError, match="uncommitted"):
+        run_experiment(cfg, part="test", **kw)
+    monkeypatch.setattr(harness, "_git_state", lambda: {"commit": "unknown", "dirty": None})
+    with pytest.raises(ScoringLockedError, match="uncommitted"):
+        run_experiment(cfg, part="test", **kw)
+    assert lock.uses() == []  # nothing was scored
+
+
+def test_test_scoring_refused_when_the_data_changed_since_the_lock(tmp_path: Path) -> None:
+    from cleanroom.lock import seal
+
+    cfg = _config(tmp_path)
+    cfg = ExperimentConfig(**{**cfg.__dict__, "raw": {"name": "tiny", "v": 4}})
+    seal(cfg.raw, tmp_path / "locks", data_sha256="0" * 64)
+    with pytest.raises(ScoringLockedError, match="data"):
+        run_experiment(
+            cfg,
+            part="test",
+            runs_dir=tmp_path / "runs",
+            cache_dir=tmp_path / "cache",
+            locks_dir=tmp_path / "locks",
+            allow_untracked_lock_for_tests=True,
+        )
 
 
 def test_split_hides_test_labels(tmp_path: Path) -> None:

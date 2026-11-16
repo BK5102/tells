@@ -49,8 +49,14 @@ def _lock_path(config: dict[str, Any], lock_dir: Path) -> tuple[str, Path]:
     return h, Path(lock_dir) / f"{h}.lock.json"
 
 
-def seal(config: dict[str, Any], lock_dir: str | Path, note: str = "") -> Lock:
-    """Create the lock for `config`, or return the existing one unchanged."""
+def seal(
+    config: dict[str, Any], lock_dir: str | Path, note: str = "", data_sha256: str | None = None
+) -> Lock:
+    """Create the lock for `config`, or return the existing one unchanged.
+
+    `data_sha256`, if given, pins the data file too: `require_lock` then
+    refuses a different file, even under the same config.
+    """
     h, path = _lock_path(config, Path(lock_dir))
     if path.exists():
         return Lock(h, path)
@@ -63,13 +69,21 @@ def seal(config: dict[str, Any], lock_dir: str | Path, note: str = "") -> Lock:
         # Stored as plain JSON so the envelope can be read and re-hashed by anyone.
         "config": json.loads(canonical_json(config)),
     }
+    if data_sha256 is not None:
+        record["data_sha256"] = data_sha256
     with path.open("x", encoding="utf-8") as f:  # "x" refuses to overwrite
         json.dump(record, f, indent=2)
     return Lock(h, path)
 
 
-def require_lock(config: dict[str, Any], lock_dir: str | Path) -> Lock:
-    """Return the lock for exactly this config, or raise LockMissingError."""
+def require_lock(
+    config: dict[str, Any], lock_dir: str | Path, data_sha256: str | None = None
+) -> Lock:
+    """Return the lock for exactly this config, or raise LockMissingError.
+
+    If the lock pinned a data checksum and `data_sha256` is given, they must
+    match. Locks sealed without a data checksum are accepted as before.
+    """
     h, path = _lock_path(config, Path(lock_dir))
     if not path.exists():
         raise LockMissingError(
@@ -78,4 +92,10 @@ def require_lock(config: dict[str, Any], lock_dir: str | Path) -> Lock:
     stored = json.loads(path.read_text(encoding="utf-8"))
     if config_hash(stored["config"]) != h or stored.get("config_hash") != h:
         raise LockMissingError(f"lock file {path.name} does not match its own config hash")
+    pinned = stored.get("data_sha256")
+    if pinned is not None and data_sha256 is not None and pinned != data_sha256:
+        raise LockMissingError(
+            f"lock {path.name} was sealed for data checksum {pinned[:12]}, "
+            f"but the data now has {data_sha256[:12]}"
+        )
     return Lock(h, path)
