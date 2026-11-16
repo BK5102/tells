@@ -123,12 +123,18 @@ class LeakCheckFailedError(AssertionError):
     """The feature builder failed its own past-only checks on this data."""
 
 
-def canary_check(tx: pl.DataFrame, seed: int = 0) -> dict[str, bool]:
+def canary_check(
+    tx: pl.DataFrame, seed: int = 0, before: datetime | None = None
+) -> dict[str, bool]:
     """Plant two leaks on a few accounts and require the leak checks to catch both.
 
     Runs on every experiment, on this experiment's own data, so a run can only
     report numbers if its leak protection was shown to work on that data.
+    `before` (the test window's start) limits it to earlier rows, so no test
+    label decides which accounts it uses.
     """
+    if before is not None:
+        tx = tx.filter(pl.col("ts") < before)
     # Half the accounts have a positive label somewhere, so the outcome canary
     # has something to leak (choosing them by label is fine: this is a test of
     # the leak checks, not a model).
@@ -335,7 +341,7 @@ def run_experiment(
 
     tx = pl.read_parquet(cfg.data)
     validate_transactions(tx)
-    canary = canary_check(tx, cfg.seed)
+    canary = canary_check(tx, cfg.seed, before=cfg.split.test.start)
     # Features are built on the full history before splitting, so evaluated
     # rows can use their own past. They are past-only (tested), and labels are
     # dropped inside the builder.

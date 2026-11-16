@@ -259,3 +259,29 @@ def test_report_history_never_writes_the_feature_cache(tmp_path: Path, synthetic
     synthetic_tx.head(100).write_parquet(data)  # the data changed since the run
     with pytest.raises(ValueError, match="checksum"):
         history_table(run.run_dir, s, cache_dir=empty)
+
+
+def test_canary_reads_no_rows_from_the_test_window(synthetic_tx, monkeypatch) -> None:
+    # Regression: the canary chose accounts by label over the whole history,
+    # so test-window labels shaped which accounts it used.
+    import tells.harness as harness
+
+    seen: list[pl.DataFrame] = []
+    real = harness.run_canary
+
+    def spy(builder, frame, **kw):
+        seen.append(frame)
+        return real(builder, frame, **kw)
+
+    monkeypatch.setattr(harness, "run_canary", spy)
+    cutoff = datetime(2015, 9, 1)
+    # Positives only inside the test window must not make an account "positive".
+    later_only = synthetic_tx.with_columns(
+        label=pl.when(pl.col("ts") >= cutoff).then(1).otherwise(pl.col("label"))
+    )
+    harness.canary_check(later_only, seed=0, before=cutoff)
+    assert seen[0]["ts"].max() < cutoff
+    before = later_only.filter(pl.col("ts") < cutoff)
+    positive_before = set(before.filter(pl.col("label") == 1)["account_id"])
+    chosen = set(seen[0]["account_id"])
+    assert len(chosen & positive_before) == harness.CANARY_ACCOUNTS // 2

@@ -176,6 +176,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why on every run: leak protection is only meaningful if it is shown to work on the data being reported.
 - Found by this check: a sample with no positive accounts makes the outcome canary undetectable, so the sample now always includes positive accounts and the Cleanroom refuses one-outcome samples.
 - Limitation: 8 accounts and 10 probes is a spot check, not a full proof; the full proofs are the unit tests.
+- Changed on 2026-11-16: the canary now uses only rows before the test window starts. It picks half its accounts by label, and before this it read labels from the whole history, so test-period labels shaped which accounts it chose. No score came from this, but the rule is that nothing reads test labels before the lock.
 
 
 ## 9. TSFM inputs and compute
