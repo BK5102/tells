@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tells.models.tsfm.base import TSFMAdapter
 
-KNOWN_MODELS = ("fake", "ttm", "ttm_recent", "chronos2", "moment")
+KNOWN_MODELS = ("fake", "ttm", "ttm_recent", "chronos2", "moment", "chronos_bolt")
 
 
 def make_adapter(name: str, **kwargs) -> TSFMAdapter:
@@ -28,4 +28,8 @@ def make_adapter(name: str, **kwargs) -> TSFMAdapter:
         from tells.models.tsfm.moment import MomentAdapter
 
         return MomentAdapter(**kwargs)
+    if name == "chronos_bolt":  # v0.2: replaces MOMENT on CPU cost
+        from tells.models.tsfm.chronos_bolt import ChronosBoltAdapter
+
+        return ChronosBoltAdapter(**kwargs)
     raise ValueError(f"unknown TSFM {name!r}")
