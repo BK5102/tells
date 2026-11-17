@@ -5,11 +5,20 @@ import polars as pl
 import pytest
 
 from tells.cases import build_cases
-from tells.data.amlworld import TRUNCATE_AT, load_amlworld, usd_rates
+from tells.data.amlworld import (
+    LI_RAW_FILE,
+    LI_TRUNCATE_AT,
+    RAW_FILE,
+    TRUNCATE_AT,
+    load_amlworld,
+    load_amlworld_li,
+    usd_rates,
+)
 from tells.data.schema import validate_transactions
 
 FIXTURE = Path(__file__).parent / "fixtures" / "amlworld_tiny.csv"
 FULL = Path(__file__).parents[1] / "data" / "interim" / "amlworld.parquet"
+FULL_LI = Path(__file__).parents[1] / "data" / "interim" / "amlworld_li.parquet"
 
 
 @pytest.fixture(scope="module")
@@ -26,6 +35,32 @@ def test_end_of_data_tail_is_truncated(ev: pl.DataFrame) -> None:
     assert datetime(2022, 9, 11) == TRUNCATE_AT
     assert ev["ts"].max() < TRUNCATE_AT
     assert ev["source_tx"].max() == 5
+
+
+def test_hi_small_defaults_unchanged() -> None:
+    # v0.1 must reproduce exactly: same file and same cut as before.
+    assert Path("data/raw/amlworld_hf_mirror/HI-Small_Trans.csv") == RAW_FILE
+    assert load_amlworld.__defaults__ == (RAW_FILE, datetime(2022, 9, 11))
+    assert load_amlworld(FIXTURE).equals(load_amlworld(FIXTURE, truncate_at=TRUNCATE_AT))
+
+
+def test_truncate_at_none_keeps_the_tail() -> None:
+    ev = load_amlworld(FIXTURE, truncate_at=None)
+    assert ev["source_tx"].max() == 6
+    assert ev["ts"].max() == datetime(2022, 9, 11)
+
+
+def test_truncate_at_earlier_date_drops_rows_from_that_date_on() -> None:
+    ev = load_amlworld(FIXTURE, truncate_at=datetime(2022, 9, 2))
+    assert ev["ts"].max() < datetime(2022, 9, 2)
+    assert sorted(ev["source_tx"].unique()) == [0, 1, 2]
+
+
+def test_li_small_defaults() -> None:
+    # LI-Small has the same end-of-data tail from 2022-09-11 (docs/data-fit.md).
+    assert Path("data/raw/amlworld_li_hf_mirror/LI-Small_Trans.csv") == LI_RAW_FILE
+    assert datetime(2022, 9, 11) == LI_TRUNCATE_AT
+    assert load_amlworld_li(FIXTURE).equals(load_amlworld(FIXTURE))
 
 
 def test_each_transaction_appears_in_both_histories(ev: pl.DataFrame) -> None:
@@ -89,3 +124,18 @@ def test_full_file_counts() -> None:
         laundering=pl.col("source_tx").filter(pl.col("label") == 1).n_unique(),
     ).collect()
     assert stats.row(0) == (5_077_237, 4_522)
+
+
+@pytest.mark.data
+@pytest.mark.skipif(not FULL_LI.exists(), reason="run `uv run tells prepare amlworld_li` first")
+def test_li_full_file_counts() -> None:
+    # Measured in docs/data-fit.md: 6,923,826 transactions and 3,431 laundering
+    # transactions before 2022-09-11. Counts only; no model touches LI-Small.
+    lf = pl.scan_parquet(FULL_LI)
+    stats = lf.select(
+        tx=pl.col("source_tx").n_unique(),
+        laundering=pl.col("source_tx").filter(pl.col("label") == 1).n_unique(),
+        last=pl.col("ts").max(),
+    ).collect()
+    assert stats.row(0)[:2] == (6_923_826, 3_431)
+    assert stats["last"].item() < LI_TRUNCATE_AT

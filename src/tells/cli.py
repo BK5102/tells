@@ -21,7 +21,7 @@ INTERIM = Path("data/interim")
 # Default small-sample sizes: TabFormer has 6,139 long-lived cards, AMLWorld
 # has 515,088 mostly short-lived accounts, so it needs more for a similar
 # number of positives.
-SMALL_N = {"tabformer": 300, "amlworld": 20_000}
+SMALL_N = {"tabformer": 300, "amlworld": 20_000, "amlworld_li": 20_000}
 
 
 def _prepare(dataset: str, raw: Path | None, out_dir: Path, small_n: int | None, seed: int) -> None:
@@ -29,6 +29,9 @@ def _prepare(dataset: str, raw: Path | None, out_dir: Path, small_n: int | None,
     if dataset == "tabformer":
         from tells.data.tabformer import RAW_FILE
         from tells.data.tabformer import load_tabformer as load
+    elif dataset == "amlworld_li":
+        from tells.data.amlworld import LI_RAW_FILE as RAW_FILE
+        from tells.data.amlworld import load_amlworld_li as load
     else:
         from tells.data.amlworld import RAW_FILE
         from tells.data.amlworld import load_amlworld as load
@@ -62,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command")
 
     prep = sub.add_parser("prepare", help="convert a raw dataset into standard-schema Parquet")
-    prep.add_argument("dataset", choices=["tabformer", "amlworld"])
+    prep.add_argument("dataset", choices=["tabformer", "amlworld", "amlworld_li"])
     prep.add_argument("--raw", type=Path, default=None)
     prep.add_argument("--out", type=Path, default=INTERIM)
     prep.add_argument("--small-n", type=int, default=None, help="accounts in the small sample")

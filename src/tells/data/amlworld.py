@@ -1,4 +1,4 @@
-"""Loader for AMLWorld HI-Small, IBM's synthetic anti-money-laundering data.
+"""Loader for AMLWorld HI-Small and LI-Small, IBM's synthetic anti-money-laundering data.
 
 Source: Altman et al., NeurIPS 2023 Datasets and Benchmarks
 (https://arxiv.org/abs/2306.16424), Kaggle "IBM Transactions for Anti Money
@@ -11,9 +11,11 @@ Choices made here, and why (see docs/methodology.md for the full reasoning):
   outgoing one for the sender (direction +1) and an incoming one for the
   receiver (direction -1). A transfer from an account to itself becomes one
   event (direction 0), so it is not double counted.
-- Rows from 2022-09-11 on are dropped. After that date the file is about 60%
-  laundering, a generator artifact that a time split would otherwise turn into
-  a free "late date means laundering" signal.
+- Rows from 2022-09-11 on are dropped (`truncate_at`). After that date the
+  file is about 60% laundering, a generator artifact that a time split would
+  otherwise turn into a free "late date means laundering" signal. HI-Small and
+  LI-Small (the v0.2 fresh test) both have this tail and the same cut date;
+  the measurements are in docs/data-fit.md.
 - Amounts come in 15 currencies, so they are converted to US dollars using the
   median exchange rate seen in cross-currency transfers on the first day only.
   The first day is inside every training window, so no later data is used.
@@ -30,6 +32,9 @@ from tells.data.schema import SORT_KEYS, TRANSACTION_SCHEMA
 
 RAW_FILE = Path("data/raw/amlworld_hf_mirror/HI-Small_Trans.csv")
 TRUNCATE_AT = datetime(2022, 9, 11)
+# LI-Small ("low illicit"): same format and generator, fresh test set for v0.2.
+LI_RAW_FILE = Path("data/raw/amlworld_li_hf_mirror/LI-Small_Trans.csv")
+LI_TRUNCATE_AT = datetime(2022, 9, 11)
 USD = "US Dollar"
 
 # The raw header repeats "Account", so columns are named by position.
@@ -80,9 +85,17 @@ def usd_rates(raw: pl.DataFrame) -> dict[str, float]:
     return out
 
 
-def load_amlworld(path: str | Path = RAW_FILE) -> pl.DataFrame:
-    """Load AMLWorld HI-Small as account events in the standard schema, sorted."""
-    raw = _scan_raw(path).filter(pl.col("ts") < TRUNCATE_AT).collect()
+def load_amlworld(
+    path: str | Path = RAW_FILE, truncate_at: datetime | None = TRUNCATE_AT
+) -> pl.DataFrame:
+    """Load an AMLWorld file as account events in the standard schema, sorted.
+
+    Rows at or after `truncate_at` are dropped; None keeps every row.
+    """
+    lf = _scan_raw(path)
+    if truncate_at is not None:
+        lf = lf.filter(pl.col("ts") < truncate_at)
+    raw = lf.collect()
     rates = usd_rates(raw)
     missing = set(raw["pay_cur"].unique()) - set(rates)
     if missing:
@@ -113,3 +126,10 @@ def load_amlworld(path: str | Path = RAW_FILE) -> pl.DataFrame:
     )
     cols = [*TRANSACTION_SCHEMA, "source_tx", "direction"]
     return events.select(cols).cast(TRANSACTION_SCHEMA).sort(SORT_KEYS)
+
+
+def load_amlworld_li(
+    path: str | Path = LI_RAW_FILE, truncate_at: datetime | None = LI_TRUNCATE_AT
+) -> pl.DataFrame:
+    """Load AMLWorld LI-Small (the v0.2 sealed test set) with its own defaults."""
+    return load_amlworld(path, truncate_at=truncate_at)

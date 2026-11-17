@@ -10,6 +10,7 @@ Numbers below come from `scripts/check_data_fit.py` unless marked "reported". "P
 |---|---|---|---|---|---|---|---|
 | IBM TabFormer credit card | Free, no account (GitHub LFS) | Yes | 6,139 cards, 2,000 users | 1991 to 2020 | 0.122% of transactions | 1,493 | **Long-history test.** Fits the idea best, but the bank-style model is near the ceiling here (methodology M4). |
 | AMLWorld HI-Small | Free Kaggle account | Yes (Hugging Face mirror, row count matches the paper) | 515,088 | 10 usable days | 0.102% of transactions | 9 | **Main test.** Thin history, but the bank-style model is far from perfect here and it is the benchmark the TSFM paper used (methodology M4). |
+| AMLWorld LI-Small | Free Kaggle account | Yes, data fit only (Hugging Face mirror, row count matches the paper) | 705,905 | 10 usable days | 0.050% of transactions | 8 | **v0.2 sealed test.** Same tail as HI-Small, same cut date, same split; no model has touched it. |
 | Sparkov (Kaggle "fraud-detection") | Free Kaggle account | No. The only public mirror found was truncated at 1,048,576 rows with rounded card numbers, so it was discarded | about 1,000 cards (reported) | 2019 to 2020 (reported) | not measured | not measured | **Set aside.** Likely fits, but a second card simulator adds little variety next to TabFormer. |
 | IEEE-CIS Fraud Detection | Free Kaggle account, accept competition rules | Yes (Hugging Face mirror, 590,540 rows, matching the official count) | 199,070 reconstructed ids | 181 days | 3.5% of transactions | 0 | **Not recommended for Tells.** No usable account histories, and labels are copied forward. |
 | PaySim | Free Kaggle account | Yes (Hugging Face mirror, 6,362,620 rows) | 6,353,307 | 30 days | 0.129% | 0 | **Dropped.** 99.9% of accounts appear exactly once. |
@@ -45,6 +46,46 @@ Traps found:
 4. **Label unit.** Labels are per transaction. The TSFM paper scores transactions; Tells also reports account-day cases (see `docs/decisions.md`).
 
 HI-Medium (16 days, about 32 million transactions, reported) may suffer from the same tail and was not measured.
+
+## AMLWorld LI-Small (v0.2 fresh test)
+
+Measured 2026-11-17. Only data fit numbers (counts, dates, labels per day, history lengths) were computed. No model has been trained or scored on LI-Small, so it stays untouched for the sealed v0.2 test (`docs/v2-plan.md` Section 4).
+
+Source: same generator and Kaggle dataset as HI-Small, "LI" meaning a lower laundering rate ([Altman et al. 2023](https://arxiv.org/abs/2306.16424)). The Kaggle original needs a login, so it comes from the Hugging Face mirror `LordNR/AMLGraphX-IBM-AML`, file `IBM-AML-LI-Small.zip`. Its `LI-Small_Trans.csv` has 6,924,049 transactions and 705,907 accounts, matching Table 1 of [Savvidi et al. 2026](https://arxiv.org/html/2610.29667v1). As a check on the mirror, its `IBM-AML-HI-Small.zip` contains a `HI-Small_Trans.csv` byte-identical to the HI-Small file used in v0.1. The only other LI mirror found, `qubit420/ibm-aml-LI-smaller`, holds 3,462,024 rows in a random train/test split, so it was not used. sha256: zip `9f84c3748053eb00b4ecc7c29f9c5f54ec8243badc854c48aa2c960c4a141479`, CSV `f7a9940339c78b5d1476071505b5867c0f5319640b9c4279d13f531bf965319d`.
+
+**End-of-data tail: present, same date as HI-Small.** Raw transactions and laundering per day:
+
+| Day | Transactions | Laundering | Laundering share |
+|---|---|---|---|
+| Sep 1 (Thu) | 1,524,807 | 310 | 0.020% |
+| Sep 2 | 1,027,758 | 350 | 0.034% |
+| Sep 3 (Sat) | 283,326 | 292 | 0.103% |
+| Sep 4 (Sun) | 282,476 | 291 | 0.103% |
+| Sep 5 | 657,397 | 370 | 0.056% |
+| Sep 6 | 657,170 | 380 | 0.058% |
+| Sep 7 | 658,504 | 368 | 0.056% |
+| Sep 8 | 657,938 | 402 | 0.061% |
+| Sep 9 | 891,573 | 367 | 0.041% |
+| Sep 10 (Sat) | 282,877 | 301 | 0.106% |
+| Sep 11 to 17 | 223 in total (77 on Sep 11, 3 on Sep 17) | 134 | 60.1% (56.3% to 71.4% per day) |
+
+Rule, the same one applied to HI-Small: cut at the first day whose laundering share jumps far above every earlier day's share. Through Sep 10 the daily share never exceeds 0.106%; from Sep 11 on it never falls below 56.3%, more than 500 times higher, while volume drops from hundreds of thousands of transactions a day to under 100. **Truncate at 2022-09-11** (keep Sep 1 to 10), as `LI_TRUNCATE_AT` in `src/tells/data/amlworld.py`. This drops 223 transactions (134 laundering) and 2 accounts that appear only in the tail.
+
+After truncation (`uv run tells prepare amlworld_li`): 6,923,826 transactions, 3,431 laundering (0.050%, about half HI-Small's 0.089%), 13,043,250 account events, 705,905 accounts. Median 4 events per account and 36.9% have at least 16 (HI-Small after truncation, same method: 4 and 37.0%). Of the 5,195 accounts with any laundering, the median had 8 prior events before its first one (p10 1, p90 39) and 32.5% had at least 16 (HI-Small: 5,862 accounts, median 8, 32.3%). Before truncation, the fit script gives 13,848,098 account-side events (self-transfers counted twice), 7,130 positive, 5,304 accounts with any laundering, median 10 prior events.
+
+**Proposed split: the same calendar as v0.1** (`configs/amlworld_li_v2_draft.yaml`), since LI-Small covers exactly Sep 1 to 10 after truncation. "First-positive" counts account-days where an account not already labeled before the period goes bad for the first time, which is what the headline metric scores. History mix is the share of account-days whose account had at least 16 earlier events.
+
+| Period | Transactions | Laundering | Account-days | Positive account-days | First-positive account-days | History 16+ |
+|---|---|---|---|---|---|---|
+| Train Sep 1 to 4 | 3,118,367 | 1,243 | 1,484,600 | 2,102 | 1,979 | 9.3% |
+| Gap Sep 5 | 657,397 | 370 | 306,621 | 615 | 542 | 34.7% |
+| Valid Sep 6 | 657,170 | 380 | 306,289 | 641 | 580 | 48.5% |
+| Gap Sep 7 | 658,504 | 368 | 307,575 | 617 | 545 | 59.4% |
+| Test Sep 8 to 10 | 1,832,388 | 1,070 | 982,049 | 1,800 | 1,549 | 62.8% |
+
+For comparison, HI-Small on the same days had 672 first-positive account-days in validation and 1,798 in test, with the same history mix (9.3% train, 48.4% validation, 62.7% test). So LI-Small has enough newly bad accounts in each period, and the training-history shift found in v0.1 (methodology M41) is present to the same degree. The first-positive counts use the same definition as `tells.cases.build_cases` but were computed with a standalone script, not a run.
+
+Traps: the same as HI-Small (only 10 usable days, weekend days about 40% of weekday volume, per-transaction labels), plus a laundering share that varies fivefold by day (0.020% on Sep 1 to 0.106% on Sep 10), driven by volume: the laundering count per day is steady (291 to 402) while total volume swings.
 
 ## Sparkov (optional, not measured)
 
