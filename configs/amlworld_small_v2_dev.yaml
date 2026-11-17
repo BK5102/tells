@@ -1,0 +1,36 @@
+# Tells v0.2 development check on the HI-Small 20,000-account sample (already seen in v0.1).
+# Purpose: prove the v0.2 pipeline runs end to end. Not used to tune anything (docs/v2-plan.md).
+# Same settings as configs/amlworld_li_v2.yaml except the data and fewer bootstrap resamples.
+name: amlworld_small_v2_dev
+dataset: amlworld
+data: data/interim/amlworld_small_n20000_seed0.parquet   # HI-Small 20,000-account sample (already seen in v0.1)
+
+split:
+  # Same calendar as v0.1 (configs/amlworld.yaml). Days: Sep 1 Thu, Sep 3-4 weekend, Sep 10 Sat.
+  min_gap_days: 1
+  train: {start: null, end: 2022-09-05}        # Thu Sep 1 to Sun Sep 4
+  valid: {start: 2022-09-06, end: 2022-09-07}  # Tue Sep 6
+  test: {start: 2022-09-08, end: 2022-09-11}   # Thu Sep 8 to Sat Sep 10
+
+# A lazy baseline, B the bank-style reference, and C (TSFM only) and D (B + TSFM) for
+# each v0.2 idea: idea 1 TTM with recent pooling (methodology M45), idea 2 Chronos-Bolt-tiny
+# (replaces MOMENT, which measured 143 ms per account-day on CPU; see docs/v2-plan.md).
+contestants:
+  - lazy_amount
+  - lgbm_checklist
+  - tsfm_only:ttm_recent
+  - checklist_tsfm:ttm_recent
+  - tsfm_only:chronos_bolt
+  - checklist_tsfm:chronos_bolt
+budgets: [0.001, 0.005, 0.01, 0.02, 0.05]
+headline: {metric: first_day_recall, budget: 0.005}   # unchanged from v0.1 on purpose (docs/v2-plan.md)
+reference: lgbm_checklist
+bootstrap: {n_boot: 200}
+seed: 0
+
+model:
+  tsfm:
+    context: 256          # same as v0.1
+    pca_components: 64    # v0.2 idea 1: keep more of the summary (16 in v0.1)
+    chunk: 50000
+controls: [label_permutation]   # methodology M37
