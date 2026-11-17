@@ -52,7 +52,7 @@ def main(run_dir: Path, out: Path) -> None:
         "|---|---|---|---|---|",
     ]
     for bud in budgets:
-        r = compare_to_reference({REF: b, NEW: d}, REF, "first_day_recall", bud, 1000, 0)
+        r = compare_to_reference({REF: b, NEW: d}, REF, "first_day_recall", bud, 300, 0)
         r = r["results"][NEW]
         mark = " (headline)" if bud == budget else ""
         lines.append(
