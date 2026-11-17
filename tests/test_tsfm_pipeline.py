@@ -212,3 +212,68 @@ def test_standardized_pca_is_not_dominated_by_one_large_number(tmp_path: Path) -
     _, _, _, std_share = fit_pca(tmp_path / "cache", all_days, 1, standardize=True)
     assert raw_share > 0.99  # the large number takes everything
     assert std_share < 0.3  # after scaling, no single direction dominates
+
+
+def test_cache_refuses_a_different_chunk_size(synthetic_tx: pl.DataFrame, tmp_path: Path) -> None:
+    # Regression: resume goes by chunk index, so a new chunk size on an
+    # existing cache would mix rows from two different slicings.
+    import pytest
+
+    keys = synthetic_tx.select("account_id", day=pl.col("ts").dt.date()).unique().head(60)
+    compute_tsfm_cache(FakeTSFM(), synthetic_tx, keys, "sha-c", 16, 20, tmp_path, _quiet)
+    with pytest.raises(ValueError, match="delete"):
+        compute_tsfm_cache(FakeTSFM(), synthetic_tx, keys, "sha-c", 16, 30, tmp_path, _quiet)
+
+
+def test_cache_refuses_a_different_set_of_keys(synthetic_tx: pl.DataFrame, tmp_path: Path) -> None:
+    import pytest
+
+    keys = synthetic_tx.select("account_id", day=pl.col("ts").dt.date()).unique().sort("day")
+    compute_tsfm_cache(FakeTSFM(), synthetic_tx, keys.head(60), "sha-k", 16, 20, tmp_path, _quiet)
+    with pytest.raises(ValueError, match="delete"):
+        compute_tsfm_cache(
+            FakeTSFM(), synthetic_tx, keys.slice(5, 60), "sha-k", 16, 20, tmp_path, _quiet
+        )
+
+
+def test_cache_accepts_an_old_meta_without_the_new_fields(
+    synthetic_tx: pl.DataFrame, tmp_path: Path
+) -> None:
+    # Caches built before 2026-11-16 have no keys or adapter checksum; they must stay usable.
+    import json
+
+    keys = synthetic_tx.select("account_id", day=pl.col("ts").dt.date()).unique().head(60)
+    out = compute_tsfm_cache(FakeTSFM(), synthetic_tx, keys, "sha-o", 16, 20, tmp_path, _quiet)
+    meta = json.loads((out / "meta.json").read_text(encoding="utf-8"))
+    for field in ("keys_sha256", "adapter_code_sha256"):
+        meta.pop(field)
+    (out / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    again = compute_tsfm_cache(FakeTSFM(), synthetic_tx, keys, "sha-o", 16, 20, tmp_path, _quiet)
+    assert again == out
+
+
+def test_loaded_table_must_be_unique_and_complete(
+    synthetic_tx: pl.DataFrame, tmp_path: Path
+) -> None:
+    import shutil
+
+    import pytest
+
+    from tells.features.tsfm_features import load_tsfm_table
+
+    keys = synthetic_tx.select("account_id", day=pl.col("ts").dt.date()).unique().head(60)
+    out = compute_tsfm_cache(FakeTSFM(), synthetic_tx, keys, "sha-d", 16, 20, tmp_path, _quiet)
+
+    def all_days(days: pl.Series) -> np.ndarray:
+        return np.ones(len(days), dtype=bool)
+
+    mean, scale, comp, _ = fit_pca(out, all_days, 2)
+    assert load_tsfm_table(out, "fake", mean, scale, comp, keys).height == keys.height
+    # A stray copy of a chunk duplicates its account-days.
+    shutil.copytree(out / "part_00000", out / "part_00099")
+    with pytest.raises(ValueError, match="duplicate"):
+        load_tsfm_table(out, "fake", mean, scale, comp, keys)
+    shutil.rmtree(out / "part_00099")
+    shutil.rmtree(out / "part_00001")  # a missing chunk loses account-days
+    with pytest.raises(ValueError, match="missing"):
+        load_tsfm_table(out, "fake", mean, scale, comp, keys)

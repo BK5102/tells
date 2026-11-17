@@ -94,16 +94,29 @@ def cost_table(s: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def history_table(run_dir: str | Path, s: dict[str, Any]) -> str:
-    """First-fraud-day catch by history length, recomputed from saved cases and data."""
+def history_table(run_dir: str | Path, s: dict[str, Any], cache_dir: Path | None = None) -> str:
+    """First-fraud-day catch by history length, recomputed from saved cases and data.
+
+    Reads the run's feature cache if it exists; otherwise builds the features in
+    memory from every column and saves nothing, so a report can never leave an
+    incomplete cache behind. Refuses if the data file changed since the run.
+    """
     from cleanroom.provenance import file_sha256
 
     from tells.harness import FEATURE_CACHE, checklist_features
 
     data = Path(s["config"]["data"])
-    tx = pl.read_parquet(data, columns=["tx_id", "account_id", "ts", "amount", "counterparty",
-                                        "category", "channel", "label"])  # fmt: skip
-    feats = checklist_features(tx, file_sha256(data), FEATURE_CACHE).select("tx_id", "n_prior")
+    data_sha = file_sha256(data)
+    recorded = s["provenance"]["data"]["transactions"]["sha256"]
+    if data_sha != recorded:
+        raise ValueError(
+            f"{data} checksum {data_sha[:12]} differs from the run's {recorded[:12]}; "
+            "the data changed since the run, so the history split cannot be recomputed"
+        )
+    tx = pl.read_parquet(data)
+    feats = checklist_features(
+        tx, data_sha, cache_dir if cache_dir is not None else FEATURE_CACHE, write=False
+    ).select("tx_id", "n_prior")
     hist = (
         tx.select("tx_id", "account_id", day=pl.col("ts").dt.date())
         .join(feats, on="tx_id")

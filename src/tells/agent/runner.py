@@ -26,7 +26,8 @@ finished run), and plot (chart data). Prefer load_results on existing runs befor
 starting new ones, because runs take minutes to hours.
 
 Rules for your final answer:
-- Never write a number yourself. Refer to results only by run id and metric name, for \
+- Never write a number yourself, in digits or in words ("two", "half", "doubled"). \
+Refer to results only by run id and metric name, for \
 example "headline of D_checklist_tsfm_ttm in run <run_id>". A report generator inserts \
 every number from the result files.
 - Say what the evidence does and does not show, including results where the TSFM did not \
@@ -42,6 +43,7 @@ class AgentResult:
     final_text: str
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     denied: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=list)  # tools that raised
     stopped_by_budget: bool = False
     turns: int = 0
 
@@ -78,6 +80,12 @@ def run_agent(
                 except ToolDenied as err:
                     result.denied.append({"tool": block["name"], "reason": str(err)})
                     content, is_error = f"Denied: {err}", True
+                except Exception as err:  # noqa: BLE001 - any failure goes back to the model
+                    # A crashed tool (bad file, failed run) should not end the
+                    # session; the model sees the error and can choose another step.
+                    message = f"{type(err).__name__}: {err}"
+                    result.errors.append({"tool": block["name"], "error": message})
+                    content, is_error = f"Error: {message}", True
             tool_results.append(
                 {
                     "type": "tool_result",

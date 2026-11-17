@@ -3,7 +3,9 @@
 The agent never gets a shell, file paths, or network access. It may only:
 
 - `run_experiment(config, part)`: run a config from `configs/` by name. The
-  test period goes through the harness, which refuses without a lock.
+  test period is denied unless the Toolbox was built with `allow_test=True`
+  (`tells agent --allow-test`), and even then goes through the harness, which
+  refuses without a committed lock.
 - `load_results(run_id)`: read a finished run's summary. Raw rows and case
   files are never returned, so labels cannot be read through this tool.
 - `plot(run_id, metric)`: chart data (budgets on x, one series per contestant).
@@ -58,21 +60,33 @@ class Toolbox:
     configs_dir: Path = Path("configs")
     runs_dir: Path = Path("artifacts/runs")
     runner: Callable[..., Any] | None = None  # injected so tests need no real runs
+    # The sealed test period is spent by a person's decision, not the agent's:
+    # off unless `tells agent --allow-test` is given.
+    allow_test: bool = False
     calls: list[dict[str, Any]] = field(default_factory=list)  # audit trail of every call
+
+    def parts(self) -> list[str]:
+        return ["valid", "test"] if self.allow_test else ["valid"]
 
     # ----- allow-list -----
     def specs(self) -> list[dict[str, Any]]:
         """Tool descriptions in the JSON-schema shape language-model APIs expect."""
+        if self.allow_test:
+            description = (
+                "Run an experiment config by name on the validation or test period. "
+                "Test scoring is refused unless the config has been sealed."
+            )
+        else:
+            description = "Run an experiment config by name on the validation period."
         return [
             {
                 "name": "run_experiment",
-                "description": "Run an experiment config by name on the validation or test period. "
-                "Test scoring is refused unless the config has been sealed.",
+                "description": description,
                 "input_schema": {
                     "type": "object",
                     "properties": {
                         "config": {"type": "string", "enum": self.config_names()},
-                        "part": {"type": "string", "enum": ["valid", "test"]},
+                        "part": {"type": "string", "enum": self.parts()},
                     },
                     "required": ["config"],
                     "additionalProperties": False,
@@ -127,8 +141,13 @@ class Toolbox:
     def _run_experiment(self, config: str, part: str = "valid") -> dict[str, Any]:
         if not CONFIG_NAME.match(config) or config not in self.config_names():
             raise ToolDenied(f"unknown config {config!r}; choose from {self.config_names()}")
-        if part not in ("valid", "test"):
-            raise ToolDenied("part must be 'valid' or 'test'")
+        if part == "test" and not self.allow_test:
+            raise ToolDenied(
+                "test scoring refused: the agent may score the test period only when a person "
+                "starts it with --allow-test"
+            )
+        if part not in self.parts():
+            raise ToolDenied(f"part must be one of {self.parts()}")
         from tells.config import load_config
         from tells.harness import ScoringLockedError, run_experiment
 

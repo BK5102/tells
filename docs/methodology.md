@@ -161,6 +161,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - When: the real configs are sealed just before the Day 26 grid, once contestants C and D exist, so one lock covers the whole plan.
 - Considered: a password or a hidden test file. Rejected: a hash committed to git is checkable by anyone and needs no trust.
 - Limitation: code edits are not blocked by the lock; git history is what makes them visible (audit check 6).
+- Changed on 2026-11-16: test scoring now also refuses when the code has uncommitted changes or the commit is unknown, and when the lock file is not tracked by git, because an uncommitted lock is not dated by anything. Each test run writes a "started" line to the uses file before test labels are revealed and a "finished" line after, and the test-run number counts started runs, so a run that crashes still counts. Older lines without a status count as one run each. `tells lock` now also pins the data file's checksum; scoring refuses different data under that lock. Locks sealed before this (without the checksum) keep working. Unit tests skip the git checks through an explicit `allow_untracked_lock_for_tests` argument, never the lock itself. Side effect: because the uses file is tracked, it must be committed after one test run before the next can start.
 
 **M30. Only the headline metric is tested formally; everything else is descriptive.**
 - What: every contestant is compared with contestant B on the first-fraud-day catch rate at 0.5%, with a paired bootstrap that resamples whole accounts (1,000 resamples in main configs, 200 in development configs). Holm and Benjamini-Hochberg corrections are applied across all comparisons. P-values use the (count + 1) / (n + 1) form, so a finite bootstrap can never claim p = 0.
@@ -175,6 +176,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why on every run: leak protection is only meaningful if it is shown to work on the data being reported.
 - Found by this check: a sample with no positive accounts makes the outcome canary undetectable, so the sample now always includes positive accounts and the Cleanroom refuses one-outcome samples.
 - Limitation: 8 accounts and 10 probes is a spot check, not a full proof; the full proofs are the unit tests.
+- Changed on 2026-11-16: the canary now uses only rows before the test window starts. It picks half its accounts by label, and before this it read labels from the whole history, so test-period labels shaped which accounts it chose. No score came from this, but the rule is that nothing reads test labels before the lock.
 
 
 ## 9. TSFM inputs and compute
@@ -185,6 +187,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why a GPU for this step only: measured on this laptop, Chronos-2 takes about 0.4 seconds per account at 256 events and 4 input series, so the AMLWorld validation day alone would need about a day of CPU. A GPU is typically one to two orders of magnitude faster for this kind of model (not measured here yet).
 - Considered: embedding once per account per window (cheaper, but stale within the window and empty for AMLWorld training accounts, whose data starts on day one); subsampling accounts for contestant D only (rejected: B and D must be trained on identical rows for a fair comparison).
 - Limitation: same-day transactions before the scored one are invisible to the embedding (the checklist still sees them). The embedding run depends on an external notebook environment; its inputs and outputs are checksummed so the cache can be verified.
+- Changed on 2026-11-16: the cache folder name was kept (so finished multi-hour caches stay valid), but `meta.json` now also records a checksum of the requested account-days, the chunk size, and a checksum of the adapter code. Chunks are resumed by position, so resuming with a different key list or chunk size could duplicate or drop account-days; that is now refused with a message to delete the cache. Fields missing from an older `meta.json` are treated as unknown and allowed. Loading the cache also checks that each account-day appears once and that every requested account-day is present.
 
 
 **M33. Surprise score: how far a transaction is from what the model expected.**
@@ -233,6 +236,8 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why: CLAUDE.md rule 4 (numbers come from result files) is only enforceable if no person or model types a number. Limiting the agent to three narrow tools means it cannot read test labels, raw data, or anything outside the project, whatever it is asked.
 - Considered: giving the agent a Python sandbox (far more flexible, far harder to audit).
 - Limitation: the history-length split for runs made before it existed is recomputed from saved cases and data; the recomputation is tested to use the same functions as live runs.
+- Changed on 2026-11-16: the report never writes the feature cache. It reads the run's cache if one exists for that data and feature code, and otherwise builds the features in memory from every column. Before, it read a subset of columns and could save an incomplete cache (without the transfer-direction and error columns) that a later run would then reuse. It also refuses if the data file's checksum differs from the one recorded in the run.
+- Changed on 2026-11-16: the agent can no longer request the test period by default. `run_experiment` offers only `valid` unless `tells agent --allow-test` is given, and a `test` request is denied before it reaches the harness. Why: spending the one sealed test run is a person's decision, not something a model should choose while exploring.
 
 
 **M40. The agent: Claude Opus 5.5 in a loop we own, a hard tool budget, and a Critic that checks every claim.**
@@ -240,6 +245,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why a manual loop instead of the SDK's tool runner: every call must pass our gatekeeper and every exchange must be recordable as a cassette, so the loop is ours. Why Opus 5.5: it is the current default Claude model; planning experiments rewards care more than speed. Why the refusal fallback: if the model declines a request, the API retries on a fallback model instead of failing the run (on by default; can be turned off in `src/tells/agent/llm.py`).
 - Tests: a hand-written cassette (not a recording of the real API) exercises the loop, the denials, the budget, the Critic, and the Reporter; replay refuses a request that differs from the recording. Recorded cassettes need an API key.
 - Limitation: the Critic checks claims against intervals, not the quality of the reasoning; an LLM review pass is planned once a key is available. The agent costs money per question (Opus 5.5 pricing in the Claude API docs).
+- Changed on 2026-11-16: four Critic fixes. The narrative now ends where the JSON summary line starts (cutting at the last "{" landed inside the nested claims). The typed-number check removes only exact known identifiers (run ids, contestant and feature names from the runs relied on, config names), ignoring case, and also rejects number words such as "two", "half", "doubled", and "percent"; before, only lowercase names were removed, so an honest answer naming D_checklist_tsfm_chronos2 failed. A claim's metric must be the metric the run actually tested. A direction of "better" or "worse" now needs the interval to exclude zero and a Holm-corrected p-value below 0.05, so claims account for how many contestants were compared (CLAUDE.md rule 11); otherwise the only accepted claim is "no clear difference". Limitation: the number-word list is fixed, so an unusual phrasing ("a dozen") can still slip through.
 
 
 **M41. On AMLWorld, accounts in training have far less history than accounts in evaluation; every run now reports this.**

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import time
 import uuid
 from dataclasses import dataclass
@@ -24,8 +25,8 @@ from typing import Any
 import numpy as np
 import polars as pl
 from cleanroom.canary import run_canary
-from cleanroom.lock import LockMissingError, require_lock
-from cleanroom.provenance import config_hash, file_sha256, stamp
+from cleanroom.lock import Lock, LockMissingError, require_lock
+from cleanroom.provenance import config_hash, file_sha256, git_state, stamp
 
 import tells.features.checklist as checklist
 from tells.cases import build_cases
@@ -88,22 +89,30 @@ def split_data(
     return parts
 
 
+def checklist_cache_path(data_sha256: str, cache_dir: Path = FEATURE_CACHE) -> Path:
+    """Where the checklist features for this data and this feature code are cached."""
+    code_sha = file_sha256(checklist.__file__)
+    key = hashlib.sha256(f"{data_sha256}:{code_sha}".encode()).hexdigest()[:16]
+    return cache_dir / f"checklist_{key}.parquet"
+
+
 def checklist_features(
-    tx: pl.DataFrame, data_sha256: str, cache_dir: Path = FEATURE_CACHE
+    tx: pl.DataFrame, data_sha256: str, cache_dir: Path = FEATURE_CACHE, write: bool = True
 ) -> pl.DataFrame:
     """Build checklist features, cached by data checksum and feature-code checksum.
 
     Changing either the data or `features/checklist.py` gives a new cache key,
-    so stale features are never reused.
+    so stale features are never reused. With `write=False` a missing cache is
+    computed in memory and not saved (used by the report, which must never
+    create a cache).
     """
-    code_sha = file_sha256(checklist.__file__)
-    key = hashlib.sha256(f"{data_sha256}:{code_sha}".encode()).hexdigest()[:16]
-    path = cache_dir / f"checklist_{key}.parquet"
+    path = checklist_cache_path(data_sha256, cache_dir)
     if path.exists():
         return pl.read_parquet(path)
     feats = checklist.build_checklist_features(tx)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    feats.write_parquet(path)
+    if write:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        feats.write_parquet(path)
     return feats
 
 
@@ -114,12 +123,18 @@ class LeakCheckFailedError(AssertionError):
     """The feature builder failed its own past-only checks on this data."""
 
 
-def canary_check(tx: pl.DataFrame, seed: int = 0) -> dict[str, bool]:
+def canary_check(
+    tx: pl.DataFrame, seed: int = 0, before: datetime | None = None
+) -> dict[str, bool]:
     """Plant two leaks on a few accounts and require the leak checks to catch both.
 
     Runs on every experiment, on this experiment's own data, so a run can only
     report numbers if its leak protection was shown to work on that data.
+    `before` (the test window's start) limits it to earlier rows, so no test
+    label decides which accounts it uses.
     """
+    if before is not None:
+        tx = tx.filter(pl.col("ts") < before)
     # Half the accounts have a positive label somewhere, so the outcome canary
     # has something to leak (choosing them by label is fine: this is a test of
     # the leak checks, not a model).
@@ -175,7 +190,7 @@ def tsfm_features(
         t0 = time.perf_counter()
         cache = compute_tsfm_cache(adapter, tx, keys, data_sha, context, chunk, root)
         mean, scale, components, explained = fit_pca(cache, train_days, k, standardize)
-        table = load_tsfm_table(cache, model, mean, scale, components)
+        table = load_tsfm_table(cache, model, mean, scale, components, expected=keys)
         tx = add_tsfm_features(tx, table, model)
         info[model] = {
             "version": adapter.version,
@@ -236,6 +251,61 @@ def label_permutation_control(
     }
 
 
+def _git_state() -> dict[str, Any]:
+    return git_state()
+
+
+def _is_tracked(path: Path) -> bool:
+    """True if git tracks this file (committed, or at least staged)."""
+    try:
+        subprocess.run(
+            ["git", "ls-files", "--error-unmatch", path.name],
+            cwd=path.parent,
+            capture_output=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return True
+
+
+def _count_test_runs(lock: Lock) -> int:
+    """Test runs recorded against a lock.
+
+    Each run writes "started" then "finished". Lines written before statuses
+    existed have none, and each of them stands for one run.
+    """
+    return sum(1 for u in lock.uses() if u.get("status") != "finished")
+
+
+def _open_lock_for_test(
+    cfg: ExperimentConfig, locks_dir: Path, data_sha: str, allow_untracked: bool
+) -> Lock:
+    """The lock for this config, refusing anything that makes the envelope unverifiable.
+
+    A lock only proves the plan came first if git dates it, so it must be
+    tracked, and the code must be committed so the run's commit names the code
+    that actually ran.
+    """
+    try:
+        lock = require_lock(cfg.raw, locks_dir, data_sha256=data_sha)
+    except LockMissingError as err:
+        raise ScoringLockedError(f"{err}. Run `uv run tells lock <config>` first.") from err
+    if allow_untracked:
+        return lock
+    state = _git_state()
+    if state["commit"] == "unknown" or state["dirty"] is not False:
+        raise ScoringLockedError(
+            "test scoring needs a clean checkout: commit or discard uncommitted changes "
+            f"first (commit {state['commit']}, dirty {state['dirty']})"
+        )
+    if not _is_tracked(lock.path):
+        raise ScoringLockedError(
+            f"lock {lock.path} is not committed to git; commit it before scoring the test"
+        )
+    return lock
+
+
 def run_experiment(
     cfg: ExperimentConfig,
     part: str = "valid",
@@ -243,25 +313,35 @@ def run_experiment(
     cache_dir: Path = FEATURE_CACHE,
     locks_dir: Path = LOCKS_DIR,
     tsfm_dir: Path = TSFM_CACHE,
+    allow_untracked_lock_for_tests: bool = False,
 ) -> RunResult:
+    """Score one part of the data.
+
+    `allow_untracked_lock_for_tests` exists only for unit tests, which seal
+    locks in temporary folders outside git. It skips the git checks, never the
+    lock itself.
+    """
     if part not in EVAL_PARTS:
         raise ValueError(f"part must be one of {EVAL_PARTS}, got {part!r}")
+    data_sha = file_sha256(cfg.data)
     lock = None
     if part == "test":
-        try:
-            lock = require_lock(cfg.raw, locks_dir)
-        except LockMissingError as err:
-            raise ScoringLockedError(f"{err}. Run `uv run tells lock <config>` first.") from err
+        lock = _open_lock_for_test(cfg, locks_dir, data_sha, allow_untracked_lock_for_tests)
 
     started = _now()
-    data_sha = file_sha256(cfg.data)
+    # The random suffix keeps two runs that start in the same second apart.
+    # exist_ok=False below still refuses to overwrite an existing run.
+    run_id = (
+        f"{started:%Y%m%dT%H%M%SZ}_{cfg.name}_{part}_{config_hash(cfg.raw)[:8]}"
+        f"_{uuid.uuid4().hex[:6]}"
+    )
     provenance = stamp(
         cfg.raw, {"transactions": cfg.data}, PACKAGES, data_checksums={"transactions": data_sha}
     )
 
     tx = pl.read_parquet(cfg.data)
     validate_transactions(tx)
-    canary = canary_check(tx, cfg.seed)
+    canary = canary_check(tx, cfg.seed, before=cfg.split.test.start)
     # Features are built on the full history before splitting, so evaluated
     # rows can use their own past. They are past-only (tested), and labels are
     # dropped inside the builder.
@@ -275,6 +355,12 @@ def run_experiment(
     known_positive = set(
         tx.filter((pl.col("ts") < eval_start) & (pl.col("label") == 1))["account_id"].unique()
     )
+    test_run_number = None
+    if lock is not None:
+        # Recorded before test labels are revealed, so a run that crashes
+        # later still counts as a test run.
+        test_run_number = _count_test_runs(lock) + 1
+        lock.record_use(run_id, status="started", git_commit=provenance["git"]["commit"])
     parts = split_data(cfg, tx, reveal_test_labels=lock is not None)
     eval_rows = parts[part]
     # How much history accounts have in training versus evaluation. A large gap
@@ -291,12 +377,6 @@ def run_experiment(
         if frame.height
     }
 
-    # The random suffix keeps two runs that start in the same second apart.
-    # exist_ok=False below still refuses to overwrite an existing run.
-    run_id = (
-        f"{started:%Y%m%dT%H%M%SZ}_{cfg.name}_{part}_{config_hash(cfg.raw)[:8]}"
-        f"_{uuid.uuid4().hex[:6]}"
-    )
     run_dir = runs_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
 
@@ -386,16 +466,16 @@ def run_experiment(
         "controls": controls,
     }
     if lock is not None:
-        previous = len(lock.uses())
-        lock.record_use(run_id, git_commit=provenance["git"]["commit"])
         summary["lock"] = {
             "config_hash": lock.config_hash,
             "lock_file": str(lock.path),
-            "test_run_number": previous + 1,
+            "test_run_number": test_run_number,
         }
     (run_dir / "results.json").write_text(
         json.dumps(summary, indent=2, default=str), encoding="utf-8"
     )
+    if lock is not None:
+        lock.record_use(run_id, status="finished", git_commit=provenance["git"]["commit"])
     _append_index(runs_dir, summary)
     return RunResult(run_dir, summary)
 

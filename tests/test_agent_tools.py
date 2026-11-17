@@ -85,3 +85,33 @@ def test_plot_returns_chart_data_and_every_call_is_logged(box: Toolbox) -> None:
     with pytest.raises(ToolDenied):
         box.call("plot", {"run_id": RUN_ID, "metric": "label"})
     assert [c["tool"] for c in box.calls] == ["plot", "plot"]
+
+
+def test_test_part_is_denied_by_default_even_with_a_working_runner(box: Toolbox) -> None:
+    # Regression: the agent could request the sealed test period on its own.
+    called = []
+
+    def runner(cfg, part):
+        called.append(part)
+        raise AssertionError("must not be reached")
+
+    box.runner = runner
+    spec = next(s for s in box.specs() if s["name"] == "run_experiment")
+    assert spec["input_schema"]["properties"]["part"]["enum"] == ["valid"]
+    with pytest.raises(ToolDenied, match="test scoring refused"):
+        box.call("run_experiment", {"config": "amlworld", "part": "test"})
+    assert called == []
+
+
+def test_test_part_reaches_the_harness_only_when_allowed(box: Toolbox) -> None:
+    from tells.harness import ScoringLockedError
+
+    def locked_runner(cfg, part):
+        raise ScoringLockedError("no lock")
+
+    box.allow_test = True
+    box.runner = locked_runner
+    spec = next(s for s in box.specs() if s["name"] == "run_experiment")
+    assert spec["input_schema"]["properties"]["part"]["enum"] == ["valid", "test"]
+    with pytest.raises(ToolDenied, match="no lock"):
+        box.call("run_experiment", {"config": "amlworld", "part": "test"})

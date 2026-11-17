@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `cleanroom.lock`: `seal` takes an optional `data_sha256` and stores it in the lock; `require_lock` takes an optional `data_sha256` and refuses a different one when the lock pinned it. Locks without the field and callers that do not pass it behave as before (not breaking).
+
 ## 0.1.0 (2026-11-14, tag `cleanroom-v0.1`)
 
 - Package skeleton inside the Tells uv workspace.

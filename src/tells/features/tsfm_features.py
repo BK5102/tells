@@ -6,7 +6,9 @@ Pipeline for one model (methodology M32 to M34):
    before midnight (`SequenceIndex`), run the model, and cache embeddings
    (float16) and next-event forecasts on disk in resumable chunks. The cache
    key covers the model version, the data checksum, the sequence code, and the
-   context length, so any change recomputes.
+   context length, so any change recomputes. `meta.json` also records the
+   requested account-days, the chunk size, and the adapter code; resuming with
+   any of those changed is refused, because chunks are matched by position.
 2. Fit PCA on account-days in the TRAINING window only (no labels are used)
    and keep the first `k` components. Hundreds of correlated numbers become a
    few columns a tree model can use, and nothing from validation or test
@@ -20,6 +22,7 @@ Pipeline for one model (methodology M32 to M34):
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import time
 from collections.abc import Callable
@@ -50,6 +53,23 @@ def _cache_dir(adapter: TSFMAdapter, data_sha: str, context: int, root: Path) ->
     return root / f"{adapter.name}_{hashlib.sha256(key.encode()).hexdigest()[:16]}"
 
 
+def _keys_sha256(keys: pl.DataFrame) -> str:
+    """Checksum of the sorted (account_id, day) list, independent of Polars internals."""
+    lines = keys.select(
+        pl.concat_str(
+            pl.col("account_id").cast(pl.String), pl.col("day").cast(pl.String), separator="|"
+        )
+    ).to_series()
+    return hashlib.sha256("\n".join(lines.to_list()).encode()).hexdigest()
+
+
+# Fields that must match an existing cache for its chunks to be reused. The
+# directory name does not include them, so caches built before they were
+# recorded keep their name; a field missing from an old meta.json is unknown
+# and allowed.
+_RESUME_FIELDS = ("n_keys", "keys_sha256", "chunk", "adapter_code_sha256")
+
+
 def compute_tsfm_cache(
     adapter: TSFMAdapter,
     tx: pl.DataFrame,
@@ -71,7 +91,9 @@ def compute_tsfm_cache(
         "data_sha256": data_sha,
         "context": context,
         "n_keys": keys.height,
+        "keys_sha256": _keys_sha256(keys),
         "chunk": chunk,
+        "adapter_code_sha256": file_sha256(inspect.getfile(type(adapter))),
     }
     meta_path = out / "meta.json"
     if meta_path.exists():
@@ -80,6 +102,14 @@ def compute_tsfm_cache(
             raise ValueError(
                 f"cache {out} was built with model revision {previous['revision']}, "
                 f"not {adapter.revision}; delete it to rebuild"
+            )
+        # Chunks are resumed by position, so a different key list or chunk size
+        # would silently mix rows from two slicings.
+        changed = [f for f in _RESUME_FIELDS if f in previous and previous[f] != meta[f]]
+        if changed:
+            raise ValueError(
+                f"cache {out} was built with a different {', '.join(changed)}; "
+                "delete that cache directory to rebuild it"
             )
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     index = None
@@ -144,9 +174,19 @@ def fit_pca(
 
 
 def load_tsfm_table(
-    cache: Path, model: str, mean: np.ndarray, scale: np.ndarray, components: np.ndarray
+    cache: Path,
+    model: str,
+    mean: np.ndarray,
+    scale: np.ndarray,
+    components: np.ndarray,
+    expected: pl.DataFrame | None = None,
 ) -> pl.DataFrame:
-    """Per (account_id, day): PCA components, forecasts, has_history."""
+    """Per (account_id, day): PCA components, forecasts, has_history.
+
+    Raises if an account-day appears twice, or if any (account_id, day) in
+    `expected` is missing: a left join would otherwise duplicate transactions
+    or quietly give them no TSFM values.
+    """
     frames = []
     for part in _parts(cache):
         keys = pl.read_parquet(part / "keys.parquet")
@@ -160,7 +200,21 @@ def load_tsfm_table(
                 **{name: pl.Series(v).fill_nan(None) for name, v in cols.items()}
             )
         )
-    return pl.concat(frames)
+    table = pl.concat(frames)
+    dupes = table.height - table.select("account_id", "day").n_unique()
+    if dupes:
+        raise ValueError(f"TSFM cache {cache} has {dupes} duplicate account-days; delete it")
+    if expected is not None:
+        missing = (
+            expected.select("account_id", "day")
+            .unique()
+            .join(table, on=["account_id", "day"], how="anti")
+        )
+        if missing.height:
+            raise ValueError(
+                f"TSFM cache {cache} is missing {missing.height} requested account-days; delete it"
+            )
+    return table
 
 
 def add_tsfm_features(tx: pl.DataFrame, table: pl.DataFrame, model: str) -> pl.DataFrame:
