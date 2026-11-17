@@ -54,3 +54,11 @@ Measured on 512 synthetic histories with realistic lengths (median 10 events, 90
 | `moment` (MOMENT-1-small) | 143 ms | 1,536 |
 
 MOMENT's cost does not depend on history length (every window is 512 steps), so at this rate the 20,000-account AMLWorld sample (96,177 account-days) needs about 4 CPU hours and one full AMLWorld day about 9. Details and choices: methodology M45 and M46.
+
+## Chronos-Bolt-tiny (v0.2 variant 2, replaces MOMENT)
+
+`amazon/chronos-bolt-tiny`, Apache-2.0, 8.65M parameters, pinned to revision `a0e552de83495b5c28c14c71c374f3e33280b340` (chronos-forecasting 2.3.2). Univariate: each of the three channels is embedded separately; the history patches before the single [REG] token are averaged per channel (padding is left NaN, rounded up to the 16-step patch; `chronos/chronos_bolt.py` lines 80-92 and 311-319) and concatenated, 3 x 256 = 768 numbers. The median next-step forecast for amount and gap gives the surprise score; embeddings are taken from the same encoder pass as the forecast (a test checks they equal `embed()`). The package's `embed` and `predict_quantiles` take no batch size, so the adapter batches 64 account-days at a time (measured fastest).
+
+Measured CPU cost on 512 realistic histories, 2 threads, with another embedding job sharing the CPU: 4.1 ms per account-day (median of three runs 5.7 ms). The pre-selection probe (1.2 ms per channel, 8 threads, idle CPU) suggested about 3.6 ms; both are well within the 10 ms selection rule and about 25 to 35 times cheaper than MOMENT-1-small (143 ms).
+
+TTM short-context checkpoints (contexts 52, 90, 180) were also probed and are not usable here: they require a frequency token input that this data does not have.
