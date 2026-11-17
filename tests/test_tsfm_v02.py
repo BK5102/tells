@@ -241,7 +241,9 @@ def test_pipeline_accepts_a_model_without_forecasts(
 ) -> None:
     from tells.features.checklist import build_checklist_features
 
-    tx = synthetic_tx.join(build_checklist_features(synthetic_tx), on="tx_id", maintain_order="left")
+    tx = synthetic_tx.join(
+        build_checklist_features(synthetic_tx), on="tx_id", maintain_order="left"
+    )
     keys = tx.select("account_id", day=pl.col("ts").dt.date()).unique()
     cache = compute_tsfm_cache(_NoForecastTSFM(), tx, keys, "sha-n", 16, 500, tmp_path, _quiet)
 

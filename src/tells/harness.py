@@ -57,6 +57,7 @@ PACKAGES = (
     "torch",
     "chronos-forecasting",
     "granite-tsfm",
+    "momentfm",
 )
 
 
