@@ -6,7 +6,10 @@ requested are exactly those the harness will request for the same config
 (every account-day inside any window), so the later run reads the cache.
 
 Usage:
-    uv run python scripts/precompute_embeddings.py configs/<name>.yaml <model>
+    uv run python scripts/precompute_embeddings.py configs/<name>.yaml <model> [worker_index worker_count]
+
+With a worker index and count, this process fills only every count-th chunk,
+so several processes can share the CPU on one cache.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ from tells.features.tsfm_features import compute_tsfm_cache
 from tells.models.tsfm import make_adapter
 
 
-def main(config_path: str, model: str) -> None:
+def main(config_path: str, model: str, worker: tuple[int, int] | None = None) -> None:
     cfg = load_config(config_path)
     settings = dict(cfg.model.get("tsfm", {}))
     context = int(settings.get("context", 256))
@@ -33,10 +36,13 @@ def main(config_path: str, model: str) -> None:
     keys = tx.filter(in_any).select("account_id", day=pl.col("ts").dt.date()).unique()
     adapter = make_adapter(model, **settings.get("adapter", {}).get(model, {}))
     print(f"{model}: {keys.height:,} account-days for {cfg.name}", flush=True)
-    path = compute_tsfm_cache(adapter, tx, keys, file_sha256(cfg.data), context, chunk)
+    path = compute_tsfm_cache(
+        adapter, tx, keys, file_sha256(cfg.data), context, chunk, worker=worker
+    )
     print(f"cache ready: {path}", flush=True)
 
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    main(sys.argv[1], sys.argv[2])
+    worker = (int(sys.argv[3]), int(sys.argv[4])) if len(sys.argv) > 4 else None
+    main(sys.argv[1], sys.argv[2], worker)

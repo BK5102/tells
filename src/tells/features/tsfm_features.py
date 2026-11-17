@@ -79,8 +79,14 @@ def compute_tsfm_cache(
     chunk: int = 20_000,
     root: Path = TSFM_CACHE,
     log: Callable[[str], None] = print,
+    worker: tuple[int, int] | None = None,
 ) -> Path:
-    """Embed every (account_id, day) in `keys`, resuming any chunks already on disk."""
+    """Embed every (account_id, day) in `keys`, resuming any chunks already on disk.
+
+    `worker=(i, n)` processes only chunks whose index c satisfies c % n == i,
+    so n processes can fill one cache in parallel without touching the same
+    chunk. Every chunk's content is the same as in a single-process run.
+    """
     out = _cache_dir(adapter, data_sha, context, root)
     out.mkdir(parents=True, exist_ok=True)
     keys = keys.select("account_id", "day").unique().sort("account_id", "day")
@@ -115,6 +121,8 @@ def compute_tsfm_cache(
     index = None
     n_chunks = (keys.height + chunk - 1) // chunk
     for c in range(n_chunks):
+        if worker is not None and c % worker[1] != worker[0]:
+            continue
         part = out / f"part_{c:05d}"
         if (part / "done").exists():
             continue

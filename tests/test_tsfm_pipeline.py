@@ -277,3 +277,23 @@ def test_loaded_table_must_be_unique_and_complete(
     shutil.rmtree(out / "part_00001")  # a missing chunk loses account-days
     with pytest.raises(ValueError, match="missing"):
         load_tsfm_table(out, "fake", mean, scale, comp, keys)
+
+
+def test_parallel_workers_fill_the_same_cache_as_one_process(
+    synthetic_tx: pl.DataFrame, tmp_path: Path
+) -> None:
+    keys = synthetic_tx.select("account_id", day=pl.col("ts").dt.date()).unique()
+    single = compute_tsfm_cache(
+        FakeTSFM(), synthetic_tx, keys, "sha-w", 16, 700, tmp_path / "a", _quiet
+    )
+    for i in range(2):
+        split = compute_tsfm_cache(
+            FakeTSFM(), synthetic_tx, keys, "sha-w", 16, 700, tmp_path / "b", _quiet, worker=(i, 2)
+        )
+    parts_a = sorted(p.name for p in single.glob("part_*") if (p / "done").exists())
+    parts_b = sorted(p.name for p in split.glob("part_*") if (p / "done").exists())
+    assert parts_a == parts_b and len(parts_a) > 2
+    for name in parts_a:
+        np.testing.assert_array_equal(
+            np.load(single / name / "emb.npy"), np.load(split / name / "emb.npy")
+        )
