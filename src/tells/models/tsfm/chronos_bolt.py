@@ -50,7 +50,7 @@ def history_patch_mean(emb: np.ndarray, lengths: np.ndarray) -> np.ndarray:
 class ChronosBoltAdapter:
     name = "chronos_bolt"
 
-    def __init__(self, context: int = 256, batch_size: int = 256, threads: int | None = None):
+    def __init__(self, context: int = 256, batch_size: int = 64, threads: int | None = None):
         import torch
         from chronos import BaseChronosPipeline
 
@@ -58,7 +58,10 @@ class ChronosBoltAdapter:
             torch.set_num_threads(threads)
         self._torch = torch
         self.context = context
-        self.batch_size = batch_size  # account-days per model call (3 series each)
+        # Account-days per model call (3 series each). 64 was fastest of 16, 64, 128, 256,
+        # 512 on 512 length-sorted AMLWorld-like histories (2 CPU threads, 2026-11-17):
+        # smaller batches mean fewer short series padded to a long neighbour.
+        self.batch_size = batch_size
         self.revision = REVISION
         self._pipe = BaseChronosPipeline.from_pretrained(
             MODEL_ID, revision=REVISION, device_map="cpu"
