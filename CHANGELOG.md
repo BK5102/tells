@@ -2,6 +2,13 @@
 
 All notable changes to Tells. The shared Cleanroom package has its own changelog in `packages/cleanroom/CHANGELOG.md`.
 
+## 0.2.0 (in progress; no result yet)
+
+A pre-registered follow-up on fresh data: `docs/v2-plan.md`.
+
+- **Plan** fixed on 2026-11-17 before any v0.2 model ran: two variants, `ttm_recent` (TTM summary of the most recent patch, 64 standardized PCA components) and `chronos_bolt` (Chronos-Bolt-tiny, revision `a0e552de83495b5c28c14c71c374f3e33280b340`), each as C (TSFM only) and D (B plus TSFM), Holm-corrected against B, headline unchanged (first-fraud-day catch at 0.5%). Sealed test: AMLWorld LI-Small, truncated at 2022-09-11, same calendar split as v0.1, config `configs/amlworld_li_v2.yaml`.
+- **Changed before sealing:** MOMENT-1-small, the first choice for variant 2, was measured at 143 ms per account-day on CPU (about 190 CPU hours for v0.2's data, no GPU) and dropped; a sample-only test would hold too few newly bad accounts to detect a gain. The replacement was chosen by a rule written first (the cheapest TSFM from a different family than TTM with embeddings, under 10 ms per account-day). Development moved to the 20,000-account HI-Small sample. Reasons: `docs/v2-plan.md` "Changes before sealing", methodology M46 to M48.
+
 ## 0.1.0 (unreleased)
 
 The first version of Tells: an evaluation of whether a time series foundation model (TSFM) helps a bank-style model catch accounts on the first day they go bad, under a fixed daily review budget, with the test plan sealed before scoring.
@@ -96,5 +103,5 @@ The full register is in `docs/methodology.md` under "Limitations register". The 
 6. **The AMLWorld copy is a Hugging Face mirror** (L4). Its counts match the paper; the checksum comparison with the official Kaggle file is still to do.
 7. **The gaps are assumptions** (L6). 90 days for cards and 1 day for laundering stand in for label delay; real delays differ.
 8. **The lock does not block code edits** (L13). Git history is what makes any edit between sealing and scoring visible.
-9. **A label-permutation control failed on TabFormer validation.** The bank-style model trained on labels shuffled within each day caught 5.9% of newly bad cards against 0.1% for random ranking (+5.8 points [+4.0, +7.8]). The same control passed on the TabFormer sealed test. A follow-up that shuffles across all days (`docs/analysis/tabformer-shuffle-scope-control.md`, generated after the sealed runs): SHUFFLE_SCOPE_PENDING.
+9. **A label-permutation control failed on TabFormer validation.** The bank-style model trained on labels shuffled within each day caught 5.9% of newly bad cards against 0.1% for random ranking (+5.8 points [+4.0, +7.8]). The same control passed on the TabFormer sealed test. A follow-up that shuffles across all days (`docs/analysis/tabformer-shuffle-scope-control.md`, generated after the sealed runs) cut the excess at 0.1% to +1.5 [+0.6, +2.6] and +0.9 [+0.3, +1.6] (two seeds). That model holds no label information, so the remainder is not a leak: busier account-days get higher maximum scores even under noise, and a tree fitted to noise still flags unusual transactions. A constant score is too weak a stand-in for chance here (methodology M42, L24).
 10. **The bank-style model is never retrained.** On TabFormer, B's catch at 0.5% fell from 90.1% on validation (2016) to 29.9% on the 2017 to 2019 test period, consistent with a model trained on data up to October 2015 going stale. Descriptive only; a rolling retrain is the next step.
