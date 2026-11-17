@@ -63,7 +63,7 @@ On the TabFormer sealed test, D was ahead of B at every budget (Section 9), but 
 
 ## 8. Next steps
 
-1. Seal a new plan with the 0.1% budget as the headline, to test the one hint the data offers, on new data or a held-out portion.
+1. A pre-registered follow-up on fresh data: this became Tells v0.2 (`docs/v2-plan.md`), testing two ideas for why the signal may have been diluted (recent pooling with more components, and MOMENT) on untouched AMLWorld LI-Small. It keeps the 0.5% headline on purpose: moving the headline to the budget where a descriptive hint appeared (0.1%) would be choosing the metric after seeing results.
 2. Run Chronos-2 on full data with a GPU.
 3. Try a rolling retrain: on AMLWorld so training includes established accounts, and on TabFormer, where the bank-style model went stale over the multi-year test period (Section 6).
 4. Replicate on real transaction data under a data-sharing agreement.

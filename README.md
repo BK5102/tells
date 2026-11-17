@@ -148,6 +148,10 @@ Descriptive only (not pre-registered tests): on AMLWorld, D was ahead at the tig
 
 Runs: `20261116T190641Z_amlworld_test_f6ff26be_ac67fd` and `20261117T045139Z_tabformer_test_701e5f22_2e74f8`. Full tables: `uv run tells report artifacts/runs/<run>`.
 
+## Version 2 (pre-registered, in progress)
+
+Both v0.1 test periods are now used, so trying new models on them would be fishing. Diagnosing v0.1 suggested two specific reasons the TSFM signal may have been watered down: averaging a history that, for short AMLWorld accounts, is mostly padding, and using models built to forecast rather than to summarize. v0.2 tests exactly two variants fixed in advance: `ttm_recent` (TTM summary from the most recent patch, 64 PCA components instead of 16) and `moment` (MOMENT-1, a model built for embeddings). The sealed test is a fresh dataset no model has touched, AMLWorld LI-Small, with the same split, contestants, and headline as v0.1 (first-fraud-day catch at 0.5%, Holm-corrected). Development stays on HI-Small's already-used validation day, and the plan is locked and committed before any model runs on LI-Small. A second negative result will be reported the same way as a win. No v0.2 result exists yet. Plan: [`docs/v2-plan.md`](docs/v2-plan.md).
+
 ## Validation results (before sealing)
 
 These are validation results, not findings. They were produced before the test periods were scored, and one setting (standardizing embeddings before PCA) was changed after seeing the first validation run, so only the test period can confirm anything. Every number is copied from the run files named below; full tables are produced by `uv run tells report <run>`.
@@ -219,6 +223,7 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 |---|---|
 | [`docs/explain-the-project.md`](docs/explain-the-project.md) | **The project as a story: every step, why, what it caused, and how to explain it in an interview.** Read this first |
 | [`docs/findings.md`](docs/findings.md) | Findings and limits: what worked, what did not, what could not be tested, next steps |
+| [`docs/v2-plan.md`](docs/v2-plan.md) | Pre-registered plan for v0.2: two variants, fresh sealed test on AMLWorld LI-Small, success rule fixed in advance |
 | [`docs/methodology.md`](docs/methodology.md) | **Every choice: what, why, what else was considered, limitation.** Start here to understand the project |
 | [`docs/decisions.md`](docs/decisions.md) | Dated diary of what was built and why, in plain English with analogies |
 | [`docs/data-fit.md`](docs/data-fit.md) | Measured fit of every candidate dataset |

@@ -276,6 +276,52 @@ This is the last layer of the honesty machinery from Part 4: checking the checke
 
 ---
 
+## Part 8b. Version 2: a pre-registered follow-up
+
+The full plan is in `docs/v2-plan.md`. It was written and fixed on 2026-11-17, before any v0.2 model ran on any data. Status: in progress; no v0.2 result exists yet.
+
+### Step 28. Step back after a negative result, instead of trying more models on the same test
+
+- **What I did:** stopped and wrote a new pre-registered plan (v0.2) rather than running new variants on the two test periods v0.1 had already used.
+- **Why:** both v0.1 test periods are spent. If I tried new embeddings on them until one beat B, one would win by luck sooner or later, and it would look like a finding without being one. That is p-hacking. But the diagnosis of v0.1 suggested specific reasons the signal might have been watered down (Step 29), and those deserve a real test. The honest way to ask a follow-up question is a new plan, fixed before any result, on data nobody has touched.
+- **What else I considered:** stopping at v0.1 (honest, but leaves cheap, specific explanations untested); trying variants on the old test periods (fishing); promoting v0.1's descriptive hints to findings (they were never pre-registered).
+- **Cause and effect:** v0.1's results stay exactly as they are. v0.2 changes no Cleanroom code, so the sibling projects are unaffected, and the new TSFM adapter follows the existing interface so it can be reused. Keeping "a sealed test is scored once" true protects all three projects, which make the same promise.
+- **How to say it:** "My first answer was an honest negative. Instead of trying new models on the test I had already used, which would be fishing, I wrote a new sealed plan to test the two most likely reasons, on data no model had seen."
+
+### Step 29. Two ideas, chosen by reasoning, not by results
+
+- **What I did:** fixed exactly two variants, each with its own C (TSFM only) and D (B plus TSFM), all compared with B under a Holm correction.
+  1. **`ttm_recent`:** the same TTM, but the summary comes from the most recent patch of the history instead of the average over all patches (a patch is a fixed-size chunk, like one page of a bank statement), and 64 standardized PCA components instead of 16.
+  2. **`moment`:** MOMENT-1, an open model from Carnegie Mellon (MIT license) built to produce summaries of whole series for classification, not mainly to forecast. Same downstream setup: 64 standardized PCA components into the same LightGBM. It has no surprise score, because it does not forecast in this mode.
+- **Why:** fraud is a change in behavior, and averaging a whole history blurs a recent change. TTM reads a 512-step window padded on the left, and AMLWorld accounts have about 10 real events, so most patches were padding and the average watered down the real signal. 16 components may also discard rare patterns. Separately, TTM and Chronos-2 were built to forecast; a model trained to summarize series might describe behavior better. The two variants test two different explanations: "wrong summary" and "wrong kind of model".
+- **What else I considered, and why not now:**
+  - Chronos-2 on full data: no GPU; on CPU it would take days.
+  - Graph features: they ask a different question (does the money network help?), not whether account histories add to a bank model.
+  - A supervised sequence model trained end to end on fraud labels: a different approach with many more settings to choose, slow on CPU; kept for a later plan.
+  - More pooling choices (max, last few patches, average of real patches only): each extra variant adds a comparison and weakens the correction. Two reasoned variants are a sharper test than many guessed ones.
+- **Cause and effect:** if `ttm_recent` helps, dilution was the problem. If only `moment` helps, the model's training goal mattered more. If neither helps, the case against frozen TSFM summaries for this task is stronger.
+- **How to say it:** "I picked two changes from the diagnosis, not from the scores: stop averaging a history that is mostly padding, and try a model built to summarize series instead of forecast them."
+
+### Step 30. Fresh data for the test, old data for development
+
+- **What I did:** the sealed test uses AMLWorld LI-Small, a sister dataset from the same generator with a lower laundering rate, which no model of mine has touched. Same calendar split as v0.1 (train Sept 1 to 4, validate Sept 6, test Sept 8 to 10, one-day gaps), if the data fit check confirms it works. All debugging happens on HI-Small's validation day, which v0.1 already used. The v0.2 config is sealed with `tells lock` and committed before any model runs on LI-Small; then LI-Small validation and test are scored, the test once.
+- **Why fresh data:** a follow-up question needs an exam the student has not seen. Why LI-Small: it asks the same question under the same rules, and there is no untouched TabFormer period left (2016 and 2017 to 2019 are used, and 2020 has no fraud). A lower laundering rate is also closer to a real bank.
+- **Why development stays on HI-Small:** code has to be checked somewhere. A day that is already spent cannot be spent again, so all checking happens there and LI-Small arrives untouched at sealing time. No setting is tuned on LI-Small, not even on its validation day.
+- **Why the headline stays at 0.5%:** v0.1 hinted at a gain at 0.1%, but moving the headline to where a hint appeared is choosing the metric after seeing data. 0.1% is reported next to it as descriptive.
+- **What else I considered:** a held-out slice of HI-Small (every usable day is already used); larger AMLWorld files (too slow to embed on a CPU with MOMENT).
+- **Cause and effect:** details that depend on compute or on the data check (MOMENT size and revision, LI-Small truncation date) are marked V2_TBD in the plan and must be filled in before sealing, never after.
+- **How to say it:** "I debugged on data I had already used and sealed the plan before the new data was ever touched, with the same headline as before, so nothing in the test could be chosen by looking at it."
+
+### Step 31. What would and would not count as a win
+
+- **A win:** at least one D variant beats B on the LI-Small sealed test, first-fraud-day catch at 0.5%, with a Holm-adjusted p below 0.05 and an interval above zero, on a run whose canary and placebo pass.
+- **Not a win:** D ahead with an interval that includes zero; ahead only at other budgets; ahead on validation but not test; any HI-Small gain.
+- **A second negative result** is a legitimate outcome and is reported exactly like a win: same tables, same places, v0.1 left untouched.
+- **Why decide this now:** if the definition of success is written after the result, any result can be called a success.
+- **How to say it:** "Before running anything, I wrote down what would count as a win, and I committed to reporting a second negative exactly the same way."
+
+---
+
 ## Part 9. Every tool and framework, and why
 
 | Tool | What it does here | Why this one |
@@ -323,3 +369,7 @@ This is the last layer of the honesty machinery from Part 4: checking the checke
 **"What would you do next?"** Run Chronos-2 on full data with a GPU, test on real data under an agreement, and try a rolling retrain so the model stays fresh (Step 25) and sees established accounts during training.
 
 **"Could your safeguards still be bypassed?"** A code review on 2026-11-16 found seven gaps, none of which changed a reported number: for example, an uncommitted lock was accepted, the agent could choose to spend the test run, and the Critic judged "better" by the interval alone instead of the multiple-comparison-corrected p-value. Each was fixed with a test that failed first (Step 27; `docs/decisions.md`, 2026-11-16). One-sentence version: "I had my own guardrails reviewed and closed every gap found, with a test proving each fix."
+
+**"Isn't a version 2 just trying until something works?"** That is what it would be if I ran new models on the v0.1 test periods until one won. v0.2 does the opposite: exactly two variants, fixed by reasoning from the v0.1 diagnosis before any v0.2 result; a dataset no model has touched; the same headline and budget as before; a Holm correction across every comparison; the success rule written in advance; and a sealed, committed plan before scoring, with the test scored once. Every variant ever tried is counted, and a second negative gets reported the same way as a win (Steps 28 to 31, `docs/v2-plan.md`). One-sentence version: "Trying until something works means many tries on one test; I made two reasoned tries on a new test, sealed in advance, and promised to report a no."
+
+**"Why should I trust v0.2 more than tweaking v0.1?"** Because tweaking v0.1 would mean choosing settings while looking at a test I had already scored, so any gain would be partly luck I picked. In v0.2 the settings are fixed before the new data is touched, development happens only on data that was already used, and git history shows the plan was committed before the first LI-Small score. It is the same protection that stopped my +5.7-point validation result from being reported as a win in v0.1. One-sentence version: "A tweak is graded on an exam I have already seen; v0.2 is graded on a new exam, with the answers I would accept written down first."
