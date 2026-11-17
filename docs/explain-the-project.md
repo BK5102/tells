@@ -274,6 +274,14 @@ This is the last layer of the honesty machinery from Part 4: checking the checke
 - **What else I considered:** fixing on the main checkout right away (breaks provenance of running jobs); waiting to review until after release (ships known gaps).
 - **How to say it:** "Before release I had my own guardrails independently reviewed. It found seven gaps, I fixed each with a test that proves it, and I kept the fixes on a separate branch until the sealed runs finished so their records would point to the exact code they ran."
 
+### Step 28. v0.2: two ideas written down before testing them
+
+- **What I did:** built two new model options without changing the v0.1 code. `ttm_recent` uses TTM's summary of the most recent 64 events instead of the average over its whole 512-step window. `moment` adds MOMENT-1-small, a pretrained model that learned by filling in hidden parts of time series (like a fill-in-the-blanks exercise) instead of forecasting.
+- **Why:** fraud is a change in behavior, and averaging blurs a change into the past. Also, most AMLWorld histories are about 10 events in a 512-step window, so the v0.1 average was mostly an average of padding. A third model from a different lab checks that the v0.1 answer is not about TTM alone.
+- **Cause and effect:** the new options get their own names, so their features and caches can never mix with v0.1's. MOMENT gives no forecast, so it has no surprise score; it is about 60 times slower than TTM on CPU (143 ms against 2.5 ms per account-day), which limits it to the AMLWorld sample. Both are untested on real runs yet.
+- **What else I considered:** larger MOMENT sizes (too slow on CPU), weighting recent patches (one more knob to tune), fine-tuning (no longer a frozen model). Details: methodology M45 and M46.
+- **How to say it:** "After a clean negative result, I wrote down two specific reasons it might have missed, the averaging and the choice of model, and built a test for each without touching the code behind the published numbers."
+
 ---
 
 ## Part 8b. Version 2: a pre-registered follow-up

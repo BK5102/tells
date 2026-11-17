@@ -21,6 +21,15 @@ tsfm = [
     "chronos-forecasting>=2.3",
     "granite-tsfm>=0.3",
 ]
+# MOMENT (v0.2 idea 2). Separate from `tsfm` because momentfm 0.1.4 pins
+# numpy==1.25.2 and transformers==4.33.3, which clash with this project; its
+# declared pins are replaced below (see [[tool.uv.dependency-metadata]]) after
+# checking that it loads every backbone weight with the versions locked here.
+# Install with `uv sync --all-packages --extra tsfm --extra moment`.
+moment = [
+    "torch>=2.6",
+    "momentfm==0.1.4",
+]
 # The experiment agent (Claude API). Optional: tests replay recorded cassettes
 # and need no key; live runs need ANTHROPIC_API_KEY or an `ant auth login` profile.
 agent = [
@@ -49,6 +58,16 @@ members = ["packages/cleanroom"]
 [tool.uv.sources]
 cleanroom = { workspace = true }
 torch = [{ index = "pytorch-cpu" }]
+
+# momentfm 0.1.4 declares exact pins (numpy 1.25.2, transformers 4.33.3,
+# huggingface-hub 0.24.0) that would downgrade the whole environment. Its code
+# only needs torch, transformers' T5 classes, and huggingface_hub's
+# PyTorchModelHubMixin; tests/test_tsfm_adapters.py checks that every backbone
+# weight loads with the versions in uv.lock (methodology M46).
+[[tool.uv.dependency-metadata]]
+name = "momentfm"
+version = "0.1.4"
+requires-dist = ["torch>=2.0", "transformers>=4.33", "huggingface-hub>=0.24", "numpy"]
 
 # CPU-only PyTorch wheels: much smaller, and no GPU is available (methodology M28).
 [[tool.uv.index]]

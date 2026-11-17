@@ -22,6 +22,11 @@ members = [
     "tells",
 ]
 
+[[manifest.dependency-metadata]]
+name = "momentfm"
+version = "0.1.4"
+requires-dist = ["torch>=2.0", "transformers>=4.33", "huggingface-hub>=0.24", "numpy"]
+
 [[package]]
 name = "accelerate"
 version = "1.15.0"
@@ -700,6 +705,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "momentfm"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+    { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/68/1c/fe4a340918118fa5e21186b2cdbfa1095521e323065973d502fec6e0ba0c/momentfm-0.1.4.tar.gz", hash = "sha256:78ce7a4d32c1328924436e82be5bbf0e1be2d8bb667950116464f3344f626a44", size = 6492130, upload-time = "2025-03-19T15:37:48.201Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/96/640c2c6e59431ba0a108fef5cea00f1686a61dfcfa9d289725e48ee05c3c/momentfm-0.1.4-py3-none-any.whl", hash = "sha256:3ddf7b6b034a9fda406d759daf1e23b757565e22ebf2d0804de30ad324bfd165", size = 34181, upload-time = "2025-03-19T15:37:46.545Z" },
 ]
 
 [[package]]
@@ -1837,6 +1859,11 @@ dependencies = [
 agent = [
     { name = "anthropic" },
 ]
+moment = [
+    { name = "momentfm" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+]
 tsfm = [
     { name = "chronos-forecasting" },
     { name = "granite-tsfm" },
@@ -1857,12 +1884,14 @@ requires-dist = [
     { name = "cleanroom", editable = "packages/cleanroom" },
     { name = "granite-tsfm", marker = "extra == 'tsfm'", specifier = ">=0.3" },
     { name = "lightgbm", specifier = ">=4.7.0" },
+    { name = "momentfm", marker = "extra == 'moment'", specifier = "==0.1.4" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "polars", specifier = ">=1.30" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "torch", marker = "extra == 'moment'", specifier = ">=2.6", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "extra == 'tsfm'", specifier = ">=2.6", index = "https://download.pytorch.org/whl/cpu" },
 ]
-provides-extras = ["tsfm", "agent"]
+provides-extras = ["tsfm", "moment", "agent"]
 
 [package.metadata.requires-dev]
 dev = [
