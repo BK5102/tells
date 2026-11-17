@@ -86,7 +86,8 @@ def test_real_chronos_bolt_version_and_revision(bolt) -> None:
 
     assert MODEL_ID == "amazon/chronos-bolt-tiny"
     assert bolt.revision == REVISION == "a0e552de83495b5c28c14c71c374f3e33280b340"
-    assert bolt.version == f"{MODEL_ID}@chronos-forecasting-{metadata.version('chronos-forecasting')}"
+    package = metadata.version("chronos-forecasting")
+    assert bolt.version == f"{MODEL_ID}@chronos-forecasting-{package}"
 
 
 def test_real_chronos_bolt_padding_and_sorting_do_not_change_outputs(bolt) -> None:
@@ -113,6 +114,21 @@ def test_real_chronos_bolt_forecast_is_the_median_next_step(bolt) -> None:
             [torch.from_numpy(s[CHANNEL_INDEX[c]])], prediction_length=1, quantile_levels=[0.5]
         )
         assert out.forecasts[0, j] == pytest.approx(float(q[0, 0, 0]), rel=1e-5, abs=1e-6)
+
+
+def test_real_chronos_bolt_embedding_matches_the_public_embed(bolt) -> None:
+    # The adapter reads encoder states from its single forecasting pass; they
+    # must equal what `ChronosBoltPipeline.embed` returns, pooled per channel.
+    import torch
+
+    from tells.models.tsfm.chronos_bolt import D_MODEL, history_patch_mean
+
+    s = SEQS[2]
+    out = bolt._run([s])
+    e, _ = bolt._pipe.embed([torch.from_numpy(row.copy()) for row in s])
+    want = history_patch_mean(e.float().numpy(), np.full(3, s.shape[1])).reshape(-1)
+    assert want.shape == (3 * D_MODEL,)
+    np.testing.assert_allclose(out.embeddings[0], want, rtol=1e-5, atol=1e-6)
 
 
 def test_real_chronos_bolt_uses_only_the_last_context_events(bolt) -> None:
