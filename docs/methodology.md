@@ -221,6 +221,7 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Why: if a noise-trained model beats random, labels are reaching the evaluation some other way (a leaky feature, a cache, a join), and every other result would be suspect. It complements the canary: the canary tests the feature checks, this tests the whole pipeline end to end.
 - Considered: shuffling the order of each account's history ("time-shuffled control"). Kept for the TSFM ablations (does order matter?), because it answers a science question rather than a leak question, and it needs a second embedding run.
 - Limitation: it detects leaks that carry label information; it cannot detect a leak that only makes the real model look slightly better.
+- See M42 for how far the shuffle reaches (within each day, not across days) and why that mattered on TabFormer validation.
 
 **M38. Explanations use LightGBM's built-in SHAP values.**
 - What: on up to 20,000 evaluated transactions, each column's contribution to each score is computed (TreeSHAP), averaged in absolute value, and the share coming from TSFM columns is reported. The five highest-scored newly bad account-days are listed with their three biggest reasons.
@@ -255,6 +256,28 @@ Rule for contributors (also in `CLAUDE.md`): any new method, variable, threshold
 - Variants tried so far on the headline (all counted for multiple-comparison purposes): TTM with unstandardized PCA (run `20261115T031830Z_amlworld_valid_f6ff26be_96919d`); TTM with standardized PCA (run `20261115T041547Z_amlworld_valid_f6ff26be_5e9b71`), which is the variant that was sealed and tested.
 - Limitation: this is a property of AMLWorld's ten-day span, and no training-window choice removes it. Results on AMLWorld must be read as "TSFM features learned on new accounts, applied to established ones". TabFormer, with decades of history in training, does not have this problem.
 
+
+## 12. After the sealed tests
+
+**M42. Shuffle scope of the label-permutation control.**
+- What: the built-in control (M37) shuffles training labels within each day. On TabFormer validation (run `20261116T193405Z_tabformer_valid_701e5f22_d9a420`) the noise-trained model caught 5.9% of newly bad cards on their first bad day at the 0.1% budget, against 0.1% for random ranking (difference +5.8 points, 95% interval +4.0 to +7.8), so the control was not consistent with chance. On the sealed TabFormer test it was (+0.4 points, -0.1 to +1.4).
+- Why it can happen without a leak: shuffling within a day keeps each day's fraud count, so the noise-trained model still learns which days had fraud. TabFormer fraud comes in bursts on particular days, and day-level traits (calendar, how busy the day is) can then carry real signal into the shuffled model. A stricter control shuffles labels across all training days, which removes that day structure. It was run as a descriptive follow-up, not a pre-registered test: `scripts/control_shuffle_scope.py` retrains the reference model with within-day, across-all-days, and a second across-all-days seed, and writes `docs/analysis/tabformer-shuffle-scope-control.md`.
+- Conclusion: SHUFFLE_SCOPE_PENDING
+- Considered: switching the built-in control to across-all-days shuffling. Not done for the sealed runs, because the control is part of the locked plan; changing it after seeing a result would be the kind of edit the lock exists to prevent.
+- Limitation: within-day shuffling is a weaker null on bursty data; a control that beats random under it is ambiguous until the stricter shuffle is checked.
+
+**M43. Model staleness on TabFormer.**
+- What: contestant B is trained through 2015 (M14) and never retrained. Its first-fraud-day catch rate at the 0.5% budget fell from 90.1% on the 2016 validation year to 29.9% on the 2017 to 2019 test period (at the 0.1% headline: 28.4% to 11.2%).
+- Why the split was still right: it was pre-registered and sealed, and the test needs several years to reach enough newly bad cards (M14: one year alone could rest on 36 cards). Changing it after seeing validation would have broken the lock's promise.
+- Considered: a rolling retrain (retrain before each test year). Possible with the same code, but it would be a new plan with a new lock, not a repair of this one.
+- Limitation: the TabFormer test numbers describe a stale model scoring years ahead, which is not how a bank runs. Fraud patterns in 2017 to 2019 may also differ from 2016, so staleness is the likely cause of the drop, not a measured one. D was trained on the same window, so the B versus D comparison stays fair.
+
+**M44. Descriptive analyses after sealing.**
+- What: `scripts/analyze_test_run.py` reads only a finished run's saved case files and `results.json`, computes every budget with 95% intervals (account bootstrap, 300 resamples) and other breakdowns, and writes a Markdown file whose numbers are formatted by code. It applies no multiple-comparison correction and labels every number "descriptive, not pre-registered". It was run only after both sealed tests were scored.
+- Why: the sealed tests answer one pre-registered question each. Readers will still ask about other budgets and subgroups; answering from saved files, clearly labeled, is better than leaving the questions open or quietly promoting a secondary number.
+- Considered: 1,000 resamples as in the main configs (slower, and the extra precision does not matter for numbers that are not tests); correcting across all breakdowns (would suggest these are tests).
+- Limitation: these numbers were chosen after seeing results, so any pattern in them is a hypothesis for a future sealed plan, not a finding.
+
 ---
 
 ## Limitations register
@@ -281,3 +304,5 @@ The honest list. Each item says what could be wrong and what was done about it.
 | L16 | Chronos-2 only on a sample | Its result has wide intervals | Same rows for B and D; TTM on full data; GPU run left as future work |
 | L17 | One forecast per account-day | Later same-day transactions compare with the first-event forecast | Checklist same-day counts cover within-day activity |
 | L18 | AMLWorld history shift between training and evaluation | TSFM summaries in evaluation look unlike those in training | Measured and reported per run (M41); standardized PCA; TabFormer as the counter-case |
+| L19 | The label-permutation control shuffles within each day | On bursty data a noise-trained model can beat random without a leak, so a failed control is ambiguous | Stricter across-all-days shuffle run as a descriptive follow-up (M42); the sealed TabFormer test's control was consistent with chance |
+| L20 | TabFormer model trained through 2015 scores 2017 to 2019 without retraining | Test numbers reflect a stale model; B's 0.5% catch fell from 90.1% to 29.9% | Split kept because it was pre-registered (M14, M43); same window for B and D; rolling retrain left as a new sealed plan |

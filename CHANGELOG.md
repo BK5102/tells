@@ -24,7 +24,9 @@ The first version of Tells: an evaluation of whether a time series foundation mo
 
 ### Results
 
-#### Sealed test (the result that counts)
+#### Sealed tests (the results that count)
+
+Across both sealed tests, adding TTM to the bank-style model gave no detectable gain at the pre-registered budget: AMLWorld +0.1 points [-1.6, +1.9] at 0.5%, TabFormer +2.0 points [-0.6, +5.0] at 0.1%.
 
 AMLWorld HI-Small, test period 2022-09-08 to 2022-09-10, 1,798 newly bad accounts. Run `20261116T190641Z_amlworld_test_f6ff26be_ac67fd`, test run number 1 under lock `f6ff26be`, sealed in commit `4a21200` before scoring.
 
@@ -39,7 +41,18 @@ Adding TTM summaries of account histories did not detectably change how many new
 
 Descriptive only, not pre-registered: D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level PR-AUC (0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%, 77.3% against 79.5% at 5%). Results were the same for short-history and long-history accounts.
 
-TabFormer (long-history test): sealed under lock `701e5f22`; the test result is pending.
+IBM TabFormer (long-history test), test period 2017-04-01 to 2019-12-31, 243 newly bad cards. Run `20261117T045139Z_tabformer_test_701e5f22_2e74f8`, test run number 1 under lock `701e5f22`, sealed in commit `4a21200` before scoring.
+
+| Contestant | First-fraud-day catch at 0.1% | Difference vs B [95% interval] | Holm p |
+|---|---|---|---|
+| A. Lazy baseline | 1.4% | -9.8 [-13.9, -5.7] | 0.006 |
+| B. Checklist + LightGBM | 11.2% | reference | |
+| C. TTM only | 2.2% | -9.0 [-12.9, -5.3] | 0.006 |
+| **D. B + TTM** | **13.2%** | **+2.0 [-0.6, +5.0]** | **0.16** |
+
+No clear difference at the pre-registered budget. The canary passed, and the label-permutation control was consistent with chance (+0.4 points, -0.1 to +1.4). About 99% of account-days in both training and test had long histories (16 or more earlier events).
+
+Descriptive only, not pre-registered: D was ahead at every budget (33.9% against 29.9% at 0.5%, 47.7% against 43.6% at 1%, 59.9% against 57.2% at 2%, 77.0% against 72.4% at 5%) and on transaction-level PR-AUC (0.114 against 0.101).
 
 #### Validation (before sealing; not findings)
 
@@ -52,6 +65,8 @@ These numbers guided development and are kept on record. One setting (standardiz
 | B. Checklist + LightGBM | 31.5% | 39.1% | 9.5% |
 | D. B + TTM | 37.2%: +5.7 [+2.3, +9.1], p 0.006 | 34.8%: -4.3 [-23.6, +11.8] | 8.7%: -0.8 [-2.2, 0.0], p 0.31 |
 | D. B + Chronos-2 | not run (needs a GPU) | 43.5%: +4.3 [-10.5, +18.2] | not run |
+
+TabFormer on full data, validation 2016, 556 newly bad cards at 0.1% (run `20261116T193405Z_tabformer_valid_701e5f22_d9a420`, same config as the sealed test): A 0.7%, B 28.4%, C 4.2%, D 31.0%; D minus B +2.5 points [-1.1, +6.0], Holm p 0.16. Its label-permutation control was not consistent with chance (see Known limitations).
 
 The first TTM variant on full AMLWorld (unstandardized PCA, run `20261115T031830Z_amlworld_valid_f6ff26be_96919d`) made D worse: 19.9% against 31.5%, -11.6 points [-15.2, -8.0]. The validation gain of +5.7 points came from the second variant and did not hold on the sealed test, which had 2.7 times as many newly bad accounts.
 
@@ -66,11 +81,12 @@ Problems found and fixed during the project, each of which would otherwise have 
 - **A biased bootstrap.** Re-ranking each resample let duplicated accounts compete for the same review slots, and one interval did not contain its own estimate. The queue is now formed once on real data, and every result reports the bootstrap mean so this bias would be visible.
 - **A blind canary.** The first AMLWorld canary sample had no laundering accounts, so a label leak could not be detected. Samples now always include positive accounts, and the Cleanroom refuses one-outcome samples.
 - **A first TSFM result caused by two problems, not the model.** PCA on raw embeddings was dominated by a few numbers on a huge scale (spreads up to 479 against a median of 7 took 97% of the variance), and AMLWorld training days hold almost only new accounts (9.3% with 16 or more earlier events) while validation is about half established (48.4%). Embeddings are now standardized before PCA, every run reports the history mix, and the first run stays on record as a tried variant.
+- **Code-review fixes** (merge `2d6e929`): cached features are validated before reuse; `tells report` never writes the feature cache; test scoring is stricter (it requires a clean checkout and a tracked lock file, and records when each test run started and finished); the agent cannot request the test period unless run with `--allow-test`; Critic fixes; the canary chooses its accounts from before the test window; and the agent loop catches tool errors instead of stopping. The test count is now 187.
 - **Same-second run folders.** Two runs starting in the same second shared a folder on fast CI machines (`fa5ea99`). Run folders now get a unique suffix and still refuse to overwrite.
 
 ### Known limitations
 
-The full register is in `docs/methodology.md` under "Limitations register". The eight that matter most:
+The full register is in `docs/methodology.md` under "Limitations register". The ten that matter most:
 
 1. **Synthetic data only, from two IBM generators** (L1, L2). Nothing here shows how a model performs at a real bank, and generator quirks may drive results.
 2. **AMLWorld has ten usable days** (L3). Gaps are one day, validation is a single day, and intervals are wide.
@@ -80,3 +96,5 @@ The full register is in `docs/methodology.md` under "Limitations register". The 
 6. **The AMLWorld copy is a Hugging Face mirror** (L4). Its counts match the paper; the checksum comparison with the official Kaggle file is still to do.
 7. **The gaps are assumptions** (L6). 90 days for cards and 1 day for laundering stand in for label delay; real delays differ.
 8. **The lock does not block code edits** (L13). Git history is what makes any edit between sealing and scoring visible.
+9. **A label-permutation control failed on TabFormer validation.** The bank-style model trained on labels shuffled within each day caught 5.9% of newly bad cards against 0.1% for random ranking (+5.8 points [+4.0, +7.8]). The same control passed on the TabFormer sealed test. A follow-up that shuffles across all days (`docs/analysis/tabformer-shuffle-scope-control.md`, generated after the sealed runs): SHUFFLE_SCOPE_PENDING.
+10. **The bank-style model is never retrained.** On TabFormer, B's catch at 0.5% fell from 90.1% on validation (2016) to 29.9% on the 2017 to 2019 test period, consistent with a model trained on data up to October 2015 going stale. Descriptive only; a rolling retrain is the next step.

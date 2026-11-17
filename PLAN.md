@@ -417,9 +417,9 @@ Each account active on a day is one case. A case's score is the highest score am
 
 Each row should end in a merged commit with a test. If a day slips, drop the next "nice to have", not the test.
 
-### Status (2026-11-16)
+### Status (2026-11-17)
 
-Built and tested: Days 1 to 25 (agent live runs need an API key). Day 26: both plans sealed; the AMLWorld test scored once (no detectable TSFM gain at the headline); full TabFormer validation and test running. Day 28: `docs/findings.md` written for AMLWorld, TabFormer section pending. Not done for lack of a GPU: Chronos-2 on full data (run on the 20,000-account AMLWorld sample instead). Deferred by the owner: live agent run, Kaggle checksum comparison, terminal recording. Reasons for every deviation are in `docs/methodology.md` and `docs/decisions.md`; the step-by-step story is in `docs/explain-the-project.md`.
+Built and tested: Days 1 to 25 (agent live runs need an API key). Days 26 and 27: both plans sealed and each test period scored once. AMLWorld (lock `f6ff26be`): contestant D minus B was +0.1 points (95% interval -1.6 to +1.9) at the 0.5% headline. TabFormer (lock `701e5f22`): +2.0 points (-0.6 to +5.0) at the 0.1% headline. Neither shows a detectable TSFM gain. The code-review guardrail fixes were merged after both sealed runs (merge commit 2d6e929). Day 28: `docs/findings.md` written for both datasets. Not done for lack of a GPU: Chronos-2 on full data (run on the 20,000-account AMLWorld sample instead). Remaining: the owner's deferred items (live agent run, Kaggle checksum comparison, terminal recording), the v0.1 tag, and making the repo public. Reasons for every deviation are in `docs/methodology.md` and `docs/decisions.md`; the step-by-step story is in `docs/explain-the-project.md`.
 
 ### Phase 0 (done 2026-11-10): decisions and data fit
 

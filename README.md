@@ -4,7 +4,7 @@
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
-> **Status (2026-11-16):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), all four contestants (two TSFMs: TTM and Chronos-2), the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (165 tests). The AMLWorld test period has been scored once under a sealed plan; its result is below. The TabFormer test is sealed and running.
+> **Status (2026-11-17):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), all four contestants (two TSFMs: TTM and Chronos-2), the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (187 tests). Both sealed tests are done, each scored once under its lock: AMLWorld and TabFormer. Results are below and in [`docs/findings.md`](docs/findings.md).
 
 ## The problem in one paragraph
 
@@ -126,30 +126,31 @@ The TSFMs are [Chronos-2](https://arxiv.org/abs/2510.15821) (119.5M parameters, 
 
 Stated before testing: if the TSFM helps, the gain should be larger on AMLWorld than on TabFormer, and results will be split by history length (fewer than 16 prior events versus 16 or more).
 
-## Main result: sealed AMLWorld test
+## Main result: both sealed tests
 
-**On the sealed AMLWorld test period, adding a time series foundation model (TTM) to the bank-style model did not catch more newly bad accounts on their first bad day at a 0.5% daily review budget: 34.5% against 34.4%, a difference of +0.1 points (95% interval -1.6 to +1.9, Holm-corrected p 0.94), across 1,798 newly bad accounts.**
+**On both sealed test periods, adding a time series foundation model (TTM) to the bank-style model gave no detectable gain in newly bad accounts caught on their first bad day at the pre-registered budget.** AMLWorld: 34.5% against 34.4% at 0.5%, +0.1 points (95% interval -1.6 to +1.9, Holm p 0.94), 1,798 newly bad accounts. TabFormer: 13.2% against 11.2% at 0.1%, +2.0 points (95% interval -0.6 to +5.0, Holm p 0.16), 243 newly bad cards.
 
-The plan was sealed by hash and committed before scoring (lock `f6ff26be`, commit `4a21200`), and this was test run number 1. The canary passed, and the bank-style model retrained on shuffled labels scored like random ranking (+0.1 points, interval -0.2 to +0.4), so there is no sign of leakage.
+Both plans were sealed by hash and committed before scoring (locks `f6ff26be` and `701e5f22`, commit `4a21200`), and each was test run number 1. Both canaries passed, and on both tests the bank-style model retrained on shuffled labels scored like random ranking (AMLWorld +0.1 points [-0.2, +0.4]; TabFormer +0.4 [-0.1, +1.4]).
 
-| Sealed test, 2022-09-08 to 2022-09-10 | First-fraud-day catch at 0.5% | Difference vs B [95% interval] |
+| First-fraud-day catch | AMLWorld, 2022-09-08 to 2022-09-10, at 0.5% | TabFormer, 2017-04-01 to 2019-12-31, at 0.1% |
 |---|---|---|
-| A. Lazy baseline | 1.6% | -32.8 [-35.0, -30.7] |
-| B. Checklist + LightGBM | 34.4% | reference |
-| C. TTM only | 1.0% | -33.4 [-35.6, -31.2] |
-| **D. B + TTM** | **34.5%** | **+0.1 [-1.6, +1.9]** |
+| Newly bad accounts | 1,798 | 243 |
+| A. Lazy baseline | 1.6%: -32.8 [-35.0, -30.7] | 1.4%: -9.8 [-13.9, -5.7] |
+| B. Checklist + LightGBM | 34.4% (reference) | 11.2% (reference) |
+| C. TTM only | 1.0%: -33.4 [-35.6, -31.2] | 2.2%: -9.0 [-12.9, -5.3] |
+| **D. B + TTM** | **34.5%: +0.1 [-1.6, +1.9], p 0.94** | **13.2%: +2.0 [-0.6, +5.0], p 0.16** |
 
-Descriptive only (not pre-registered tests): D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level PR-AUC (0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%, 77.3% against 79.5% at 5%). There was no clear difference in either history group (short: 32.8% against 33.6%; long: 36.2% against 35.2%; not tested).
+Differences are against B in percentage points, with 95% account-level bootstrap intervals and Holm-corrected p-values.
 
-**Why this differs from validation:** on the single validation day, D was +5.7 points ahead, but that came from the second variant tried (standardizing embeddings before PCA), chosen after the first variant made D worse. The sealed test period has 2.7 times as many newly bad accounts and was untouched by any choice. It is the number that counts, and it is why the test was sealed before scoring.
+Descriptive only (not pre-registered tests): on AMLWorld, D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level PR-AUC (0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%, 77.3% against 79.5% at 5%), with no clear difference in either history group (short: 32.8% against 33.6%; long: 36.2% against 35.2%). On TabFormer, D was ahead at every budget (for example 33.9% against 29.9% at 0.5%, 77.0% against 72.4% at 5%). Also on TabFormer, B's catch at 0.5% fell from 90.1% on validation (2016) to 29.9% on the test period, consistent with a model trained on data up to October 2015 going stale over several years.
 
-Run: `20261116T190641Z_amlworld_test_f6ff26be_ac67fd`. Full tables: `uv run tells report artifacts/runs/20261116T190641Z_amlworld_test_f6ff26be_ac67fd`.
+**Why AMLWorld differs from validation:** on the single validation day, D was +5.7 points ahead, but that came from the second variant tried (standardizing embeddings before PCA), chosen after the first variant made D worse. The sealed test period has 2.7 times as many newly bad accounts and was untouched by any choice. It is the number that counts, and it is why the test was sealed before scoring.
 
-The long-history test (full TabFormer with TTM) is sealed and running (about 9 CPU hours of embedding).
+Runs: `20261116T190641Z_amlworld_test_f6ff26be_ac67fd` and `20261117T045139Z_tabformer_test_701e5f22_2e74f8`. Full tables: `uv run tells report artifacts/runs/<run>`.
 
 ## Validation results (before sealing)
 
-These are validation results, not findings. The test period is still sealed, and one setting (standardizing embeddings before PCA) was changed after seeing the first validation run, so only the test period can confirm anything. Every number is copied from the run files named below; full tables are produced by `uv run tells report <run>`.
+These are validation results, not findings. They were produced before the test periods were scored, and one setting (standardizing embeddings before PCA) was changed after seeing the first validation run, so only the test period can confirm anything. Every number is copied from the run files named below; full tables are produced by `uv run tells report <run>`.
 
 **Headline: share of newly bad accounts caught on their first bad day.** Differences are against contestant B, in percentage points, with 95% intervals from 1,000 account-level bootstrap resamples and Holm-corrected p-values.
 
@@ -163,6 +164,8 @@ These are validation results, not findings. The test period is still sealed, and
 | **D. B + TTM** | **37.2%: +5.7 [+2.3, +9.1], p 0.006** | 34.8%: -4.3 [-23.6, +11.8] | 8.7%: -0.8 [-2.2, 0.0], p 0.31 |
 | C. Chronos-2 only | not run (needs a GPU) | 4.3% | not run |
 | D. B + Chronos-2 | not run (needs a GPU) | 43.5%: +4.3 [-10.5, +18.2] | not run |
+
+TabFormer on full data (run `20261116T193405Z_tabformer_valid_701e5f22_d9a420`, validation 2016, 556 newly bad cards, 0.1% budget): A 0.7%, B 28.4%, C 4.2%, D 31.0%; D minus B +2.5 points [-1.1, +6.0], Holm p 0.16. Its label-permutation control was not consistent with chance (see "Problems found" item 9).
 
 What this says so far:
 
@@ -185,6 +188,7 @@ These are the moments that made the evaluation more trustworthy:
 6. **A blind canary.** The first canary sample on AMLWorld had no laundering accounts, so a label leak could not be detected. The sample now always includes positive accounts, and the Cleanroom refuses a sample that cannot catch it.
 7. **A first TSFM result that came from two problems, not from the model.** The first TTM run made the bank-style model worse on AMLWorld. Two causes: PCA on raw embedding numbers was dominated by a few numbers on a huge scale, and AMLWorld's training days hold almost only brand-new accounts (9.3% with 16 or more earlier events) while the validation day is half established accounts (48.4%). Embeddings are now standardized before PCA, every run reports this history mix, and the first run is kept and counted.
 8. **A flaky CI test.** Two runs starting in the same second shared a folder on fast CI machines. Run folders now get a unique suffix and still refuse to overwrite.
+9. **A control that did not look like chance.** On TabFormer validation, the bank-style model retrained on labels shuffled within each day caught 5.9% of newly bad cards against 0.1% for random ranking (+5.8 points [+4.0, +7.8]). Shuffling within a day keeps each day's fraud rate, which a model might still learn from. The same control on the TabFormer sealed test was consistent with chance. A follow-up control that shuffles across all days is in [`docs/analysis/tabformer-shuffle-scope-control.md`](docs/analysis/tabformer-shuffle-scope-control.md). Outcome: SHUFFLE_SCOPE_PENDING.
 
 ## Limitations
 
@@ -219,7 +223,9 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | [`docs/decisions.md`](docs/decisions.md) | Dated diary of what was built and why, in plain English with analogies |
 | [`docs/data-fit.md`](docs/data-fit.md) | Measured fit of every candidate dataset |
 | [`docs/audits/`](docs/audits/) | Three leak audits with PASS / FAIL per check, including one proving the test was sealed before scoring |
-| `docs/analysis/` | Descriptive follow-up analyses (not pre-registered), generated after the TabFormer run |
+| [`docs/analysis/amlworld-test-descriptive.md`](docs/analysis/amlworld-test-descriptive.md) | AMLWorld sealed test: intervals at every budget, per-day results, who catches whom (descriptive, generated after the sealed runs) |
+| [`docs/analysis/tabformer-test-descriptive.md`](docs/analysis/tabformer-test-descriptive.md) | The same for the TabFormer sealed test (descriptive, generated after the sealed runs) |
+| [`docs/analysis/tabformer-shuffle-scope-control.md`](docs/analysis/tabformer-shuffle-scope-control.md) | Follow-up label-permutation control that shuffles across all days (generated after the sealed runs) |
 | [`PLAN.md`](PLAN.md) | Background from zero, requirements, the 30-day plan |
 | `packages/cleanroom/` | The shared honest-exam toolkit |
 | `src/tells/` | Loaders, features, contestants, harness, evaluation |
@@ -236,4 +242,4 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | 4. TSFM contestants | 12 to 17 | Done (validation) |
 | 5. Controls, explainability, cost | 18 to 20 | Done |
 | 6. Agent harness | 21 to 25 | Built; live runs need an API key |
-| 7. Seal, test, findings, write-up | 26 to 30 | AMLWorld test done; TabFormer test running |
+| 7. Seal, test, findings, write-up | 26 to 30 | Both sealed tests done; findings written |

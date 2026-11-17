@@ -10,6 +10,15 @@ This is the guide to read before talking about Tells with a recruiter, a hiring 
 
 The technical detail behind each step is in `docs/methodology.md` (numbered M1, M2, ...), the dated diary is in `docs/decisions.md`, and the numbers come from run files under `artifacts/runs/`. This file links them into one story.
 
+## Elevator pitch (final)
+
+Say this in about 30 seconds, then let them pick what to dig into.
+
+- **Question:** "Banks can only review a tiny share of cases each day. I tested whether a pretrained time series foundation model, which summarizes each account's history, helps the tree model a bank already runs catch fraud on the first day an account goes bad."
+- **Method:** "I added the foundation model's summary as extra columns to a bank-style LightGBM model and compared it with the same model without them, on a synthetic money-laundering dataset and a synthetic card-fraud dataset, at a fixed daily review budget."
+- **Honest result:** "On my validation data it looked like a win, but on two sealed test periods, scored once each, it added no detectable gain at the budgets I had committed to in advance."
+- **Why you can trust it:** "The test plan was hashed and committed before any test score existed, every run plants a fake leak that must be caught, a model trained on shuffled labels serves as a placebo, and the gaps an independent code review found were fixed and merged without touching the sealed runs."
+
 ---
 
 ## Part 1. The question
@@ -50,7 +59,7 @@ The technical detail behind each step is in `docs/methodology.md` (numbered M1, 
 - **What I did:** AMLWorld (synthetic money laundering, short histories, 10 usable days) is the main test; TabFormer (synthetic card fraud, decades of history) is the long-history test.
 - **Why:** they are opposites on the thing that matters (history length), and AMLWorld is the benchmark a published TSFM paper used.
 - **What else I considered:** two card-fraud datasets (TabFormer plus Sparkov). Less variety.
-- **Cause and effect:** AMLWorld later turned out to have a training/evaluation history shift (Step 18), which only showed up because the two datasets differ.
+- **Cause and effect:** AMLWorld later turned out to have a training/evaluation history shift (Step 20), which only showed up because the two datasets differ.
 - **How to say it:** "I picked a short-history dataset and a long-history one on purpose, so if the foundation model helps on one and not the other, history length is the first suspect."
 
 ### Step 5. Load the data into one standard shape, carefully
@@ -175,7 +184,7 @@ The technical detail behind each step is in `docs/methodology.md` (numbered M1, 
 ### Step 21. Controls and explanations
 
 - **What I did:** a label-permutation control (the bank model retrained on shuffled labels must score like random ranking) and SHAP explanations (which inputs drive each score, and how much of D's reasoning comes from the TSFM).
-- **Cause and effect:** every control so far scored like random ranking, so no hidden leak. On full AMLWorld, TTM columns provide 16.5% of D's SHAP attribution.
+- **Cause and effect:** every AMLWorld control, and the TabFormer test-period control, scored like random ranking, so no hidden leak there. The one exception, TabFormer validation, is explained in Step 24. On full AMLWorld, TTM columns provide 16.5% of D's SHAP attribution.
 - **How to say it:** "A placebo group for the model, and an explanation for every flag."
 
 ---
@@ -193,30 +202,77 @@ The technical detail behind each step is in `docs/methodology.md` (numbered M1, 
 - **Read it as:** on full AMLWorld, the TSFM helped, mostly when review slots are scarce (15.0% against 7.9% at 0.1%), and slightly hurt at loose budgets (80.1% against 83.0% at 5%). TTM alone was weak everywhere. The samples were too small to see an effect of this size.
 - **Caveat to say out loud:** this was the second variant tried, chosen after seeing the first. That is why the test period was sealed next.
 
-### Step 23. Sealed test results
+### Step 23. Sealed test results (AMLWorld and TabFormer)
 
-- **What I did:** sealed the AMLWorld plan (split, headline, contestants, TSFM settings in the config) by hash; settings that live in code, such as standardizing before PCA, are pinned by the git commit stamped on the run. I committed the lock file, then scored the test period (Sept 8 to 10) exactly once. The TabFormer plan was sealed at the same time, before any full-data TSFM run on it.
-- **Result:** D (bank-style model plus TTM) caught 34.5% of newly bad accounts on their first bad day at a 0.5% budget, against 34.4% for B: +0.1 points, 95% interval -1.6 to +1.9, p 0.94, across 1,798 newly bad accounts. No detectable difference.
-- **Descriptive details (not pre-registered):** D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level ranking (PR-AUC 0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%).
-- **Cause and effect:** the validation gain (+5.7 points) came from a variant chosen after seeing the first validation run, on a single day. The sealed test, with 2.7 times as many new bad accounts and no choices made on it, did not confirm it. This is the protection the lock was built for, and it worked.
-- **Integrity checks on this run:** canary passed; the label-permutation control scored like random ranking; test run number 1 under lock `f6ff26be`.
-- **How to say it:** "My validation result looked like a win, but I had picked that version after seeing an earlier failure, so I sealed the plan before touching the test data. On the sealed test the foundation model added nothing at the budget I had committed to. That is my headline result, and I trust it more than the validation number because of how it was produced."
+- **What I did:** sealed each dataset's plan (split, headline, contestants, TSFM settings in the config) by hash; settings that live in code, such as standardizing before PCA, are pinned by the git commit stamped on the run. I committed the lock files, then scored each test period exactly once. The TabFormer plan was sealed at the same time as AMLWorld's, before any full-data TSFM run on it.
 
-Where to point people: `docs/findings.md` (the full write-up), `docs/analysis/amlworld-test-descriptive.md` (generated by `scripts/analyze_test_run.py` once the TabFormer run frees the CPU) (every budget with intervals, each day, who catches whom), and `docs/audits/2026-11-16-sealed-test-audit.md` (proof the test was sealed first and scored once).
+| Sealed test, headline: first-bad-day catch | AMLWorld (Sept 8 to 10), 0.5% budget | TabFormer (April 2017 to 2019), 0.1% budget |
+|---|---|---|
+| Newly bad accounts | 1,798 | 243 cards |
+| B. Bank-style model | 34.4% | 11.2% |
+| D. B + TTM | 34.5% | 13.2% |
+| D minus B, 95% interval | +0.1 points [-1.6, +1.9] | +2.0 points [-0.6, +5.0] |
+| Holm-corrected p | 0.94 | about 0.16 |
+| Verdict | no clear difference | no clear difference |
+| Lock, test run number | `f6ff26be`, run 1 | `701e5f22`, run 1 |
 
-**Follow-up you will get: "So the project failed?"** No. The question was whether a TSFM adds value at a fixed review budget, under an evaluation that cannot be gamed. The answer, for TTM on AMLWorld at 0.5%, is "not detectably", with a tight interval (about plus or minus 2 points). A clean negative result from a rigorous setup is more useful to a fraud team than an unverified positive one, and the hints (better at the tightest budget, better transaction ranking) say where to look next.
+- **Descriptive details (not pre-registered):** on AMLWorld, D was ahead at the tightest budget (13.6% against 11.0% at 0.1%) and on transaction-level ranking (PR-AUC 0.398 against 0.321), and behind at loose budgets (58.8% against 63.1% at 2%). On TabFormer, D was ahead at every budget (for example 33.9% against 29.9% at 0.5%, 77.0% against 72.4% at 5%), but none of these were the tested comparison.
+- **Combined message:** across both sealed tests, TTM added no detectable gain at the pre-registered budgets. TabFormer leans in D's favor, but its interval includes zero, and "leans" is not a finding.
+- **Cause and effect:** the AMLWorld validation gain (+5.7 points) came from a variant chosen after seeing the first validation run, on a single day. The sealed test, with 2.7 times as many new bad accounts and no choices made on it, did not confirm it. This is the protection the lock was built for, and it worked.
+- **Integrity checks:** both runs passed the canary, and in both the bank model trained on shuffled labels scored like random ranking (TabFormer: 0.5% against 0.1% for random, interval for the difference -0.1 to +1.4 points). The TabFormer test run started from a clean, committed checkout.
+- **How to say it:** "I sealed two test plans before seeing any test data and scored each one once. On both, adding the foundation model gave no detectable gain at the budget I had committed to: plus 0.1 points on money laundering and plus 2 points on card fraud, with intervals that include zero. My validation result had looked like a win, and the sealed tests are exactly what stopped me from reporting it as one."
+
+Where to point people: `docs/findings.md` (the full write-up), `docs/analysis/amlworld-test-descriptive.md` (every budget with intervals, each day, who catches whom; generated by `scripts/analyze_test_run.py`, not produced yet), and `docs/audits/2026-11-16-sealed-test-audit.md` (proof the test was sealed first and scored once).
+
+### Step 24. A control that failed on TabFormer validation, and what I did about it
+
+- **What happened:** on TabFormer validation (2016, run `20261116T193405Z_tabformer_valid_701e5f22_d9a420`), D was +2.5 points over B (31.0% against 28.4%, interval -1.1 to +6.0, 556 newly bad cards): no clear difference. But the label-permutation control failed: the bank model trained on labels shuffled within each day caught 5.9% on the first bad day, against 0.1% for random ranking (difference +5.8 points, interval +4.0 to +7.8). A placebo is not supposed to work.
+- **Why this can happen without a leak:** the control shuffles labels only inside each day. That keeps how many fraud labels each day has, so it still tells the model which days were fraud-heavy. TabFormer fraud comes in bursts on particular days, so a model can learn "transactions that look like a burst day are riskier" without ever seeing whose transaction was fraud. Analogy: shuffle the names on each day's list of failed students but keep how many failed each day; if failures cluster on exam days, you can still learn "exam days are bad" without knowing anyone's grade.
+- **Why I did not just assume that:** the other leak defenses passed on this run (canary caught both planted cheats; features are proven past-only by replay), and the same control on the TabFormer test period scored like random ranking. That points to day-level timing, not a leak, but "points to" is not proof.
+- **What I did:** added a stricter control that shuffles labels across all training days, which also breaks the link between labels and days. If that one scores like random, the within-day excess came from fraud bursts, not a leak. It was run after the sealed tests and does not change them: the sealed results are what they are, and this is a diagnostic next to them.
+- **What else I considered:** dropping the within-day control (it hides the problem, and dropping a check after it fails is the opposite of honest); treating the failure as proof of a leak and discarding the run (not supported by the other checks).
+- **Outcome of the stricter control:** SHUFFLE_SCOPE_PENDING
+- **How to say it:** "My placebo model beat random on one dataset, so I asked why before deciding it was fine. Shuffling labels within a day still tells the model which days had fraud, and card fraud there comes in bursts, so I added a stricter placebo that shuffles across all days and reported its result next to the sealed tests, without changing them."
+
+### Step 25. The baseline goes stale over time
+
+- **What I saw:** B caught 90.1% of newly bad cards on their first bad day at a 0.5% budget on TabFormer validation (2016), but 29.9% on the test period (April 2017 to 2019). At the 0.1% headline budget it fell from 28.4% to 11.2%.
+- **Why (most likely):** the model is trained on data through September 2015 and never updated. The test period starts 18 months later and runs for almost three years, so the fraud patterns it learned have drifted further and further from what it is scored on. The test window is also a different mix of fraud cases, so this is the likely main cause, not a measured one.
+- **Cause and effect:** this is why banks retrain models on a schedule. It also changes how to read the TabFormer test: both B and D were judged as stale models, which is a fair comparison between them but not how a bank would deploy either.
+- **What else I considered:** retraining during the test period. Not allowed: the sealed plan fixes training to end in 2015, and changing it after seeing results would break the seal. A rolling retrain (retrain every few months, test on the next few) is the natural next step, under a new sealed plan.
+- **How to say it:** "My baseline caught 90% on the year right after training and 30% on the years after that, because a model trained through 2015 goes stale. That is why banks retrain, and a rolling retrain is my next experiment."
 
 
 ---
 
-## Part 8. The agent
+## Part 8. The agent, and a final honesty check before release
 
-### Step 24. An AI assistant that runs experiments but cannot cheat
+### Step 26. An AI assistant that runs experiments but cannot cheat
 
 - **What I did:** Claude Opus 5.5 in a loop I own, with three tools only (run an experiment by config name, read a run's summary, get chart data), a 10-call budget, and a rule that it may not write numbers. A Critic checks every claim against the run files without any model; a Reporter puts the model's words next to tables generated by code, marked as a draft for human review.
 - **Why a loop I own:** every call must pass my allow-list and every exchange must be recordable for free, repeatable tests.
 - **Why no numbers from the model:** language models can invent numbers; numbers come only from files.
 - **How to say it:** "The agent can plan and run experiments (tested offline with a recorded conversation so far), but it cannot read raw data, cannot open the sealed test without the lock, and cannot type a number. A checker rejects any claim the data does not support."
+
+### Step 27. An independent code review and docs audit before release
+
+This is the last layer of the honesty machinery from Part 4: checking the checkers.
+
+- **What I did:** while the sealed runs were going, two AI agents worked in parallel: one reviewed the code for gaps in the guardrails, one audited the docs for statements that were stale or claimed too much.
+- **What the code review found (7 issues):**
+  1. The TSFM cache could return duplicated rows if the chunk size changed between runs.
+  2. The report command could write an incomplete feature cache.
+  3. Test scoring did not require the code to be committed.
+  4. The agent could ask for the test period on its own.
+  5. The Critic could be fooled by numbers spelled out in words, and could misjudge "better" or "worse" because it did not use the Holm correction.
+  6. The canary used test-window labels to choose which accounts to sample.
+  7. One tool error could crash the agent's whole loop.
+- **What the docs audit found:** stale statements and overclaims. The main one: docs said the lock seals the code, but it hashes the config file only. Code settings, such as standardizing before PCA, are pinned by the git commit stamped on each run, and the docs now say so.
+- **How the fixes went in:** each fix got a regression test (a test that fails on the old code and passes on the fixed code), on a separate branch in its own git worktree. The branch was merged only after the sealed runs finished.
+- **Why hold fixes on a branch:** a run stamps the git commit it started from. If I had changed the main checkout mid-run, the stamp would point to code the run never used, and the provenance record would quietly lie. Keeping fixes on a branch kept every sealed run's stamp true.
+- **Cause and effect:** none of the seven issues changed a reported number; they closed doors nobody had walked through yet. Details: `docs/decisions.md`, 2026-11-16.
+- **What else I considered:** fixing on the main checkout right away (breaks provenance of running jobs); waiting to review until after release (ships known gaps).
+- **How to say it:** "Before release I had my own guardrails independently reviewed. It found seven gaps, I fixed each with a test that proves it, and I kept the fixes on a separate branch until the sealed runs finished so their records would point to the exact code they ran."
 
 ---
 
@@ -232,11 +288,13 @@ Where to point people: `docs/findings.md` (the full write-up), `docs/analysis/am
 | PyTorch (CPU build) | Runs the TSFMs | Required by both TSFM packages; CPU wheels are smaller and no GPU is available |
 | chronos-forecasting | Chronos-2 | Amazon's official package, with an official embedding API |
 | granite-tsfm | TTM r2 | IBM's official package for TTM |
-| pytest | 165 tests | Standard; supports skipping data-dependent tests in CI |
+| pytest | 187 tests (more after the review fixes) | Standard; supports skipping data-dependent tests in CI |
 | ruff | Lint and formatting | One fast tool for both |
 | GitHub Actions | CI on Python 3.11 and 3.12 | Free for the repo; every push is tested |
 | Anthropic Python SDK | The agent's model calls | Official SDK for Claude; optional install so the rest needs no key |
 | Hugging Face Hub | Model downloads | Where both TSFMs are published; pinned to exact commits |
+| git worktrees and branches | Kept the review fixes in a separate folder and branch while sealed runs were going | A run stamps the commit it started from; editing the main checkout mid-run would make that stamp point to code the run never used (Step 27) |
+| Parallel AI agents | One reviewed the code, one audited the docs, at the same time | An independent reader catches what the author misses, like a second proofreader; running them in parallel fit the review into the time the sealed runs took |
 
 ---
 
@@ -250,10 +308,18 @@ Where to point people: `docs/findings.md` (the full write-up), `docs/analysis/am
 
 **"Why didn't you run the big model on everything?"** No GPU. I measured it at about 125 ms per account-day on CPU; full data would take days. I ran it on a sample and labeled that.
 
-**"How do you know there is no leakage?"** Features are proven past-only by replay; every run plants two cheats that must be caught; a model trained on shuffled labels must score like random, and did; the test plan is sealed by hash before scoring.
+**"So the project failed?"** No. The question was whether a TSFM adds value at a fixed review budget, under an evaluation that cannot be gamed. The answer, for TTM on both sealed tests, is "not detectably": +0.1 points on AMLWorld (interval -1.6 to +1.9) and +2.0 points on TabFormer (interval -0.6 to +5.0). A clean negative result from a rigorous setup is more useful to a fraud team than an unverified positive one, and the hints (D ahead at the tightest AMLWorld budget, ahead at every TabFormer budget) say where a new sealed test should look.
+
+**"How do you know there is no leakage?"** Features are proven past-only by replay; every run plants two cheats that must be caught; a model trained on shuffled labels must score like random, and did on every run except TabFormer validation (next question); the test plan is sealed by hash before scoring.
+
+**"Your control failed on TabFormer validation. Doesn't that mean a leak?"** Not necessarily, and I did not assume either way. The control shuffled labels within each day, which keeps how many frauds each day had, and TabFormer fraud comes in bursts on particular days, so a model can learn "burst days are risky" without any leak. The canary and the replay checks passed on that run, and the same control passed on the TabFormer test period. To test the explanation, I ran a stricter control that shuffles labels across all days. Outcome: SHUFFLE_SCOPE_PENDING. One-sentence version: "My placebo worked a little on one dataset, so I found the likely reason, designed a stricter placebo to test it, and reported the result either way."
+
+**"Why did your baseline drop from 90% to 30%?"** On TabFormer at a 0.5% budget, B caught 90.1% in 2016 and 29.9% in April 2017 to 2019. It was trained through September 2015 and never updated, so it went stale as fraud patterns drifted; the test also covers a different set of fraud cases, so staleness is the likely main cause, not a measured one. That is why banks retrain, and a rolling retrain under a new sealed plan is my next step.
+
+**"How do you know your own code did not have bugs?"** Four layers. 187 automated tests, including tests against hand-worked answers. Planted bugs, to prove the leak checks catch them (Steps 11 and 12). An independent code review before release, which found seven gaps (Step 27). And a regression test for every fix, which failed on the old code before it passed on the new. That does not prove zero bugs; it means each kind of bug I could think of has a test that would catch it.
 
 **"What went wrong?"** My first TSFM result was negative because of a dataset shift and a scaling mistake; my first confidence intervals were biased; my first headline counted known-bad accounts; my first canary had a blind spot. Each was found by a check, fixed, tested, and documented.
 
-**"What would you do next?"** Run Chronos-2 on full data with a GPU, test on real data under an agreement, and try a rolling retrain so the model sees established accounts during training.
+**"What would you do next?"** Run Chronos-2 on full data with a GPU, test on real data under an agreement, and try a rolling retrain so the model stays fresh (Step 25) and sees established accounts during training.
 
-**"Could your safeguards still be bypassed?"** A code review on 2026-11-16 found seven gaps, none of which changed a reported number: for example, an uncommitted lock was accepted, the agent could choose to spend the test run, and the Critic judged "better" by the interval alone instead of the multiple-comparison-corrected p-value. Each was fixed with a test that failed first (`docs/decisions.md`, 2026-11-16). One-sentence version: "I had my own guardrails reviewed and closed every gap found, with a test proving each fix."
+**"Could your safeguards still be bypassed?"** A code review on 2026-11-16 found seven gaps, none of which changed a reported number: for example, an uncommitted lock was accepted, the agent could choose to spend the test run, and the Critic judged "better" by the interval alone instead of the multiple-comparison-corrected p-value. Each was fixed with a test that failed first (Step 27; `docs/decisions.md`, 2026-11-16). One-sentence version: "I had my own guardrails reviewed and closed every gap found, with a test proving each fix."
