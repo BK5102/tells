@@ -1,0 +1,64 @@
+{
+  "config_hash": "cf534a03d8c153c3312aa5cd311fe7ae6fb4f7d07941c1c3dea930a603226a9e",
+  "sealed_utc": "2026-11-17T23:17:08.297930+00:00",
+  "git": {
+    "commit": "2d240f910a0cb4686ab0e626e24a0577f7abcf98",
+    "dirty": false
+  },
+  "note": "Tells v0.2, sealed 2026-11-17 before any model was trained or scored on LI-Small. Pre-registration: docs/v2-plan.md (including its dated changes-before-sealing list). Variants tried on LI-Small before sealing: 0. Development: one pipeline check on the already-seen HI-Small 20,000-account sample (run 20261117T230941Z_amlworld_small_v2_dev_valid_677aec5b_f60914), not used to tune anything. Frozen: split (train Sept 1 to 4, valid Sept 6, test Sept 8 to 10), 0.5% first-fraud-day headline, contestants A, B, C and D for ttm_recent (last-patch pooling) and chronos_bolt (Chronos-Bolt-tiny), 64 standardized PCA components, context 256, label-permutation control. Validation and test scored after this commit; test once.",
+  "config": {
+    "bootstrap": {
+      "n_boot": 1000
+    },
+    "budgets": [
+      0.001,
+      0.005,
+      0.01,
+      0.02,
+      0.05
+    ],
+    "contestants": [
+      "lazy_amount",
+      "lgbm_checklist",
+      "tsfm_only:ttm_recent",
+      "checklist_tsfm:ttm_recent",
+      "tsfm_only:chronos_bolt",
+      "checklist_tsfm:chronos_bolt"
+    ],
+    "controls": [
+      "label_permutation"
+    ],
+    "data": "data/interim/amlworld_li.parquet",
+    "dataset": "amlworld_li",
+    "headline": {
+      "budget": 0.005,
+      "metric": "first_day_recall"
+    },
+    "model": {
+      "tsfm": {
+        "chunk": 50000,
+        "context": 256,
+        "pca_components": 64
+      }
+    },
+    "name": "amlworld_li_v2",
+    "reference": "lgbm_checklist",
+    "seed": 0,
+    "split": {
+      "min_gap_days": 1,
+      "test": {
+        "end": "2022-09-11",
+        "start": "2022-09-08"
+      },
+      "train": {
+        "end": "2022-09-05",
+        "start": null
+      },
+      "valid": {
+        "end": "2022-09-07",
+        "start": "2022-09-06"
+      }
+    }
+  },
+  "data_sha256": "8e4115285b91445faac7ddff0c770fa01ae881564cf2578cc976a13b7956cbe1"
+}
