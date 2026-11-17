@@ -1,0 +1,37 @@
+# Tells v0.2 sealed test: AMLWorld LI-Small, never touched by any model before sealing.
+# Pre-registration: docs/v2-plan.md. Data fit: docs/data-fit.md, "AMLWorld LI-Small (v0.2 fresh test)".
+# Every setting below is fixed before any v0.2 result exists; changes before sealing are
+# listed with reasons in docs/v2-plan.md, "Changes before sealing".
+name: amlworld_li_v2
+dataset: amlworld_li
+data: data/interim/amlworld_li.parquet   # `uv run tells prepare amlworld_li`, truncated before 2022-09-11
+
+split:
+  # Same calendar as v0.1 (configs/amlworld.yaml). Days: Sep 1 Thu, Sep 3-4 weekend, Sep 10 Sat.
+  min_gap_days: 1
+  train: {start: null, end: 2022-09-05}        # Thu Sep 1 to Sun Sep 4
+  valid: {start: 2022-09-06, end: 2022-09-07}  # Tue Sep 6
+  test: {start: 2022-09-08, end: 2022-09-11}   # Thu Sep 8 to Sat Sep 10
+
+# A lazy baseline, B the bank-style reference, and C (TSFM only) and D (B + TSFM) for
+# each v0.2 idea: idea 1 TTM with recent pooling (methodology M45), idea 2 Chronos-Bolt-tiny
+# (replaces MOMENT, which measured 143 ms per account-day on CPU; see docs/v2-plan.md).
+contestants:
+  - lazy_amount
+  - lgbm_checklist
+  - tsfm_only:ttm_recent
+  - checklist_tsfm:ttm_recent
+  - tsfm_only:chronos_bolt
+  - checklist_tsfm:chronos_bolt
+budgets: [0.001, 0.005, 0.01, 0.02, 0.05]
+headline: {metric: first_day_recall, budget: 0.005}   # unchanged from v0.1 on purpose (docs/v2-plan.md)
+reference: lgbm_checklist
+bootstrap: {n_boot: 1000}
+seed: 0
+
+model:
+  tsfm:
+    context: 256          # same as v0.1
+    pca_components: 64    # v0.2 idea 1: keep more of the summary (16 in v0.1)
+    chunk: 50000
+controls: [label_permutation]   # methodology M37
