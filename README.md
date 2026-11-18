@@ -95,7 +95,7 @@ flowchart LR
 | Luck check | Paired bootstrap over whole accounts, Holm and Benjamini-Hochberg corrections | A win must be bigger than chance, and an account's days belong together | `cleanroom.bootstrap`, `cleanroom.stats` |
 | Provenance | Every result stores config hash, git commit, data checksum, library versions; every run is logged forever | Every number must trace back to exact inputs, and runs that did not help stay on record | `cleanroom.provenance`, `artifacts/runs/index.jsonl` |
 
-The Cleanroom is a separate, domain-neutral package so the sibling projects (credit risk and payments) sit the same exam: `uv add "cleanroom @ git+https://github.com/BK5102/tells@cleanroom-v0.2#subdirectory=packages/cleanroom"`.
+The Cleanroom is a separate, domain-neutral package so the sibling projects, [Reserve](https://github.com/BK5102/reserve) (credit risk) and [Culprit](https://github.com/BK5102/culprit) (payments), sit the same exam: `uv add "cleanroom @ git+https://github.com/BK5102/tells@cleanroom-v0.2#subdirectory=packages/cleanroom"`.
 
 ## Data, and why these two datasets
 
