@@ -194,9 +194,9 @@ def test_real_moment_shapes_empty_rows_and_no_forecast() -> None:
 
 
 def test_real_moment_ignores_masked_padding() -> None:
+    adapter = _moment()  # skips when torch or momentfm is missing, so import torch after it
     import torch
 
-    adapter = _moment()
     from tells.models.tsfm.moment import moment_window
 
     x, mask = moment_window(SEQS[1:])
