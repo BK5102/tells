@@ -10,7 +10,8 @@ from history (for example rolling statistics) may still read earlier rows;
 keeping those inputs past-only is a separate, separately tested guarantee.
 
 Several splits (rolling origins, a named holdout period) are expressed as a
-list of `Split` objects, so callers that handle one split handle many.
+list of `Split` objects, so callers that handle one split handle many;
+`rolling_origins` builds such a list.
 """
 
 from __future__ import annotations
@@ -146,3 +147,49 @@ class Split:
             valid=Window.from_dict(d["valid"]) if d.get("valid") else None,
             min_gap=timedelta(days=d.get("min_gap_days", 0)),
         )
+
+
+def rolling_origins(
+    start: Any,
+    end: Any,
+    step: timedelta,
+    horizon: timedelta,
+    gap: timedelta = timedelta(0),
+    train_start: Any = None,
+) -> list[Split]:
+    """Rolling-origin evaluation: refit at a series of dates and score the next stretch.
+
+    The k-th split trains on [train_start, origin_k), skips `gap`, and tests on
+    [origin_k + gap, origin_k + gap + horizon), where origin_k = start + k * step.
+    Origins continue while the test window ends at or before `end`. Training
+    windows expand (they all begin at `train_start`, or at the start of the
+    data when it is None). Each split has `min_gap = gap`, so `Split.check`
+    re-verifies the gap on the rows. Test windows overlap when step < horizon.
+    """
+    first = _to_datetime(start)
+    last = _to_datetime(end)
+    if first is None or last is None:
+        raise SplitError("start and end are required")
+    for name, value in (("step", step), ("horizon", horizon)):
+        if not isinstance(value, timedelta) or value <= timedelta(0):
+            raise SplitError(f"{name} must be a positive timedelta, got {value!r}")
+    if not isinstance(gap, timedelta) or gap < timedelta(0):
+        raise SplitError(f"gap must be a non-negative timedelta, got {gap!r}")
+    origin_train_start = _to_datetime(train_start)
+    splits = []
+    origin = first
+    while origin + gap + horizon <= last:
+        splits.append(
+            Split(
+                train=Window(origin_train_start, origin),
+                test=Window(origin + gap, origin + gap + horizon),
+                min_gap=gap,
+            )
+        )
+        origin += step
+    if not splits:
+        raise SplitError(
+            f"no origin fits: the first test window would end at {first + gap + horizon}, "
+            f"after end {last}"
+        )
+    return splits

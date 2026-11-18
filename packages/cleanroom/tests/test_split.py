@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 
 import polars as pl
 import pytest
-from cleanroom.split import LeakError, Split, SplitError, Window
+from cleanroom.split import LeakError, Split, SplitError, Window, rolling_origins
 
 D = datetime
 
@@ -119,3 +119,81 @@ def test_from_dict_accepts_yaml_style_dates() -> None:
 def test_to_dict_round_trips() -> None:
     split = _split()
     assert Split.from_dict(split.to_dict()) == split
+
+
+# --- rolling origins -------------------------------------------------------------
+
+
+def test_rolling_origins_hand_computed() -> None:
+    # Origins Jan 10, 17, 24; each tests the 7 days after a 1-day gap. The third
+    # test window ends exactly at `end` and is kept; a fourth would end Feb 8.
+    splits = rolling_origins(
+        D(2020, 1, 10),
+        D(2020, 2, 1),
+        step=timedelta(days=7),
+        horizon=timedelta(days=7),
+        gap=timedelta(days=1),
+    )
+    assert [(s.train.end, s.test.start, s.test.end) for s in splits] == [
+        (D(2020, 1, 10), D(2020, 1, 11), D(2020, 1, 18)),
+        (D(2020, 1, 17), D(2020, 1, 18), D(2020, 1, 25)),
+        (D(2020, 1, 24), D(2020, 1, 25), D(2020, 2, 1)),
+    ]
+    assert all(s.train.start is None and s.min_gap == timedelta(days=1) for s in splits)
+
+
+def test_rolling_origins_accepts_dates_and_fixed_train_start() -> None:
+    splits = rolling_origins(
+        "2020-03-01",
+        date(2020, 4, 1),
+        timedelta(days=10),
+        timedelta(days=10),
+        train_start=date(2020, 1, 1),
+    )
+    assert len(splits) == 3
+    assert all(s.train.start == D(2020, 1, 1) for s in splits)
+    assert splits[0].test.start == splits[0].train.end  # zero gap by default
+
+
+def test_rolling_origins_leak_check_on_rows() -> None:
+    df = _frame()
+    for split in rolling_origins(
+        D(2020, 3, 1),
+        D(2021, 1, 1),
+        timedelta(days=30),
+        timedelta(days=30),
+        gap=timedelta(days=14),
+    ):
+        parts = split.apply(df, "t")
+        split.check(parts, "t")
+        assert parts["train"]["t"].max() < split.train.end
+        assert parts["test"]["t"].min() - parts["train"]["t"].max() >= timedelta(days=14)
+
+
+def test_rolling_origins_round_trip_through_dicts() -> None:
+    splits = rolling_origins(D(2020, 2, 1), D(2020, 6, 1), timedelta(days=30), timedelta(days=30))
+    assert [Split.from_dict(s.to_dict()) for s in splits] == splits
+
+
+def test_rolling_origins_input_checks() -> None:
+    with pytest.raises(SplitError, match="no origin fits"):
+        rolling_origins(D(2020, 1, 1), D(2020, 1, 5), timedelta(days=1), timedelta(days=7))
+    with pytest.raises(SplitError, match="step"):
+        rolling_origins(D(2020, 1, 1), D(2020, 3, 1), timedelta(0), timedelta(days=7))
+    with pytest.raises(SplitError, match="gap"):
+        rolling_origins(
+            D(2020, 1, 1),
+            D(2020, 3, 1),
+            timedelta(days=7),
+            timedelta(days=7),
+            gap=timedelta(days=-1),
+        )
+    with pytest.raises(SplitError):
+        # A training start after the first origin is not a window.
+        rolling_origins(
+            D(2020, 1, 1),
+            D(2020, 3, 1),
+            timedelta(days=7),
+            timedelta(days=7),
+            train_start=D(2020, 2, 1),
+        )
