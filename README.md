@@ -212,7 +212,7 @@ These are the moments that made the evaluation more trustworthy:
 
 ## Limitations
 
-The short list. The full register, with what was done about each, is in [`docs/methodology.md`](docs/methodology.md#limitations-register).
+The short list. The full register, with what was done about each, is in [`docs/methodology.md`](docs/methodology.md#limitations-register), and [`docs/expert-review.md`](docs/expert-review.md) lists what an expert reviewer would still ask (mainly: is the v0.2 gain caused by pretraining, and how much would training randomness widen the interval).
 
 - Synthetic data only, from two IBM generators. Nothing here shows how a model performs at a real bank.
 - AMLWorld has ten usable days, so gaps are one day and validation is a single day; intervals will be wide.

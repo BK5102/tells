@@ -145,5 +145,6 @@ Run `20261117T235515Z_amlworld_li_v2_test_cf534a03_0f604f`, config hash `cf534a0
 - It is specific to Chronos-Bolt. The reworked TTM did not help, so this is not "TSFMs help".
 - Validation disagreed in direction.
 - At loose budgets D was behind (descriptive).
+- Not yet tested, and the first things an expert would ask (`docs/expert-review.md`, L29 to L31): whether the pretraining causes the gain or simple history statistics would match it; how much training-seed and day-to-day variation widen the interval; and replication beyond the same generator.
 - Why Chronos-Bolt helps where TTM did not is not tested. It forecasts with quantiles and reads each channel separately; both are candidate reasons, not shown ones.
 
