@@ -379,6 +379,14 @@ The full plan is in `docs/v2-plan.md`. It was written and fixed on 2026-11-17, b
 - **Cause and effect:** v0.1's negative was partly about the model, not the idea. That is exactly what the second variant was there to check.
 - **How to say it:** "My first model gave a clean negative. I diagnosed it, wrote down two fixes and a win rule before touching new data, and one fix, a different pretrained model, gave a 3-point gain that survives correction. I'm careful to say it's one model on one synthetic dataset, and that the validation day pointed the other way."
 
+### Step 34. Cleanroom v0.2: new exam tools for the sibling projects
+
+- **What I did:** added version 0.2.0 of the shared Cleanroom package with tools that Reserve and Culprit need: scores for forecasts that give ranges instead of one number, a test of whether one forecaster really beats another over time, backtests from many start dates, lookups that use each figure as it was first published, alarm scoring (how fast faults are caught and how many false alarms), a guard for sealed runs, and a vault that keeps the answer key shut until a sealed run has finished. Tells' own code was not touched.
+- **Why:** the honesty rules should be written once and shared, so a sibling cannot get them subtly wrong in its own copy (methodology M27, M50).
+- **What else I considered:** letting each sibling write its own versions; using Newey-West weights in the Diebold-Mariano test, which a simulation showed rejects a true "no difference" about 9% of the time instead of 5%, so equal weights are the default.
+- **Cause and effect:** the siblings can now be graded by the same exam board as Tells, including on forecasts and alarms that Tells never needed.
+- **How to say it:** "I extended the shared exam toolkit for my two sibling projects, and a simulation in its tests caught that the textbook variance choice would have made one of the new tests too eager to declare a winner."
+
 ---
 
 ## Part 9. Every tool and framework, and why

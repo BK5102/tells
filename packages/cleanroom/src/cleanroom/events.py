@@ -148,6 +148,8 @@ def persistent_alarms(
     """Positions (into `scores`) where an alarm fires under the module's persistence rule.
 
     Rows must be in time order within each group; runs never cross groups.
+    "Consecutive" means consecutive samples, not elapsed time, so with irregular
+    sampling the same k covers different lengths of time.
     """
     s = _times(scores, "scores")
     k = _check_k(persistence_k)
