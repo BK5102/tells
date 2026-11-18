@@ -1,13 +1,14 @@
 [project]
 name = "cleanroom"
-version = "0.1.0"
-description = "A domain-neutral toolkit for honest time-ordered model evaluation: splits, sealed-envelope lock, metrics, bootstrap, canary."
+version = "0.2.0"
+description = "A domain-neutral toolkit for honest time-ordered model evaluation: splits, sealed-envelope lock, sealed runs, answer-key vault, metrics, forecast scores, bootstrap, canary."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [
     "numpy>=2.4.6",
     "polars>=1.30",
+    "scipy>=1.17",
 ]
 
 [build-system]

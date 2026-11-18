@@ -28,8 +28,9 @@ tells/
   pyproject.toml  uv.lock          # uv workspace root; members: packages/cleanroom
   packages/cleanroom/              # the shared Cleanroom, its own installable package
     pyproject.toml
-    src/cleanroom/  split.py  lock.py  metrics.py  calibration.py  bootstrap.py
-                    stats.py (multiple-comparison correction)  canary.py  provenance.py
+    src/cleanroom/  split.py  lock.py  metrics.py  calibration.py  bootstrap.py  forecast.py
+                    stats.py (multiple-comparison correction, Diebold-Mariano)  canary.py  provenance.py
+                    asof.py  events.py  guard.py  vault.py   (added in cleanroom-v0.2)
     tests/
   src/tells/
     data/        loaders for each dataset, one file per dataset

@@ -4,7 +4,7 @@
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
-> **Status (2026-11-17): complete.** The honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), the contestants, the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (214 tests). Three sealed tests are done, each scored once under its lock. v0.1 (TTM, on AMLWorld HI-Small and TabFormer) found no detectable gain. v0.2, pre-registered on fresh data (AMLWorld LI-Small), found a modest, significant gain from one of its two variants (Chronos-Bolt-tiny: +3.2 points, Holm p 0.016) and none from the other. Results are below and in [`docs/findings.md`](docs/findings.md).
+> **Status (2026-11-17): complete.** The honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`, extended for the sibling projects in `cleanroom-v0.2`), the contestants, the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (214 tests). Three sealed tests are done, each scored once under its lock. v0.1 (TTM, on AMLWorld HI-Small and TabFormer) found no detectable gain. v0.2, pre-registered on fresh data (AMLWorld LI-Small), found a modest, significant gain from one of its two variants (Chronos-Bolt-tiny: +3.2 points, Holm p 0.016) and none from the other. Results are below and in [`docs/findings.md`](docs/findings.md).
 
 ## The problem in one paragraph
 
@@ -95,7 +95,7 @@ flowchart LR
 | Luck check | Paired bootstrap over whole accounts, Holm and Benjamini-Hochberg corrections | A win must be bigger than chance, and an account's days belong together | `cleanroom.bootstrap`, `cleanroom.stats` |
 | Provenance | Every result stores config hash, git commit, data checksum, library versions; every run is logged forever | Every number must trace back to exact inputs, and runs that did not help stay on record | `cleanroom.provenance`, `artifacts/runs/index.jsonl` |
 
-The Cleanroom is a separate, domain-neutral package so the sibling projects (credit risk and payments) sit the same exam: `uv add "cleanroom @ git+https://github.com/BK5102/tells@cleanroom-v0.1#subdirectory=packages/cleanroom"`.
+The Cleanroom is a separate, domain-neutral package so the sibling projects (credit risk and payments) sit the same exam: `uv add "cleanroom @ git+https://github.com/BK5102/tells@cleanroom-v0.2#subdirectory=packages/cleanroom"`.
 
 ## Data, and why these two datasets
 

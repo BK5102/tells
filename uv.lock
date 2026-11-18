@@ -118,18 +118,21 @@ wheels = [
 
 [[package]]
 name = "cleanroom"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/cleanroom" }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "polars" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "polars", specifier = ">=1.30" },
+    { name = "scipy", specifier = ">=1.17" },
 ]
 
 [[package]]

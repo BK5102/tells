@@ -56,6 +56,25 @@ def git_state(cwd: str | Path = ".") -> dict[str, Any]:
     return {"commit": commit, "dirty": dirty}
 
 
+def is_tracked(path: str | Path) -> bool:
+    """True if git tracks this file (committed, or at least staged).
+
+    A file only proves it existed at a point in time if git dates it, so
+    sealed records must be tracked before they are relied on.
+    """
+    p = Path(path)
+    try:
+        subprocess.run(
+            ["git", "ls-files", "--error-unmatch", p.name],
+            cwd=p.parent,
+            capture_output=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return True
+
+
 def package_versions(names: Iterable[str]) -> dict[str, str]:
     out = {}
     for name in names:
