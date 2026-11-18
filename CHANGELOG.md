@@ -2,14 +2,15 @@
 
 All notable changes to Tells. The shared Cleanroom package has its own changelog in `packages/cleanroom/CHANGELOG.md`.
 
-## 0.2.0 (in progress; no result yet)
+## 0.2.0 (2026-11-17)
 
 A pre-registered follow-up on fresh data: `docs/v2-plan.md`.
 
 - **Plan** fixed on 2026-11-17 before any v0.2 model ran: two variants, `ttm_recent` (TTM summary of the most recent patch, 64 standardized PCA components) and `chronos_bolt` (Chronos-Bolt-tiny, revision `a0e552de83495b5c28c14c71c374f3e33280b340`), each as C (TSFM only) and D (B plus TSFM), Holm-corrected against B, headline unchanged (first-fraud-day catch at 0.5%). Sealed test: AMLWorld LI-Small, truncated at 2022-09-11, same calendar split as v0.1, config `configs/amlworld_li_v2.yaml`.
 - **Changed before sealing:** MOMENT-1-small, the first choice for variant 2, was measured at 143 ms per account-day on CPU (about 190 CPU hours for v0.2's data, no GPU) and dropped; a sample-only test would hold too few newly bad accounts to detect a gain. The replacement was chosen by a rule written first (the cheapest TSFM from a different family than TTM with embeddings, under 10 ms per account-day). Development moved to the 20,000-account HI-Small sample. Reasons: `docs/v2-plan.md` "Changes before sealing", methodology M46 to M48.
+- **Result** (sealed test, AMLWorld LI-Small, 2022-09-08 to 2022-09-10, 1,549 newly bad accounts; run `20261117T235515Z_amlworld_li_v2_test_cf534a03_0f604f`, test run number 1 under lock `cf534a03`, sealed in commit `b8a1927`): D_chronos_bolt caught 24.0% of newly bad accounts on their first bad day at the 0.5% budget against 20.7% for B, +3.2 points [+1.1, +5.4], Holm p 0.016, which meets the pre-registered win rule. D_ttm_recent caught 21.6%, +0.8 [-1.2, +2.8], Holm p 0.42: no detectable gain. The canary passed and the label-permutation control was consistent with chance (+0.0 points, -0.3 to +0.4). A Bonferroni bound over all four sealed TSFM tests in the project gives 0.032. Caveats: one synthetic dataset; a modest effect (roughly 50 more of 1,549 accounts at the same budget); LI-Small validation pointed the other way (-2.1 [-5.9, +1.4]); D behind B at the 2% and 5% budgets (descriptive); the gain is specific to Chronos-Bolt. Details: methodology M49, L25 to L28.
 
-## 0.1.0 (unreleased)
+## 0.1.0 (tagged `v0.1`)
 
 The first version of Tells: an evaluation of whether a time series foundation model (TSFM) helps a bank-style model catch accounts on the first day they go bad, under a fixed daily review budget, with the test plan sealed before scoring.
 

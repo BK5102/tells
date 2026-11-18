@@ -4,7 +4,7 @@
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
-> **Status (2026-11-17):** the honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), all four contestants (two TSFMs: TTM and Chronos-2), the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (187 tests). Both sealed tests are done, each scored once under its lock: AMLWorld and TabFormer. Results are below and in [`docs/findings.md`](docs/findings.md).
+> **Status (2026-11-17): complete.** The honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`), the contestants, the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (214 tests). Three sealed tests are done, each scored once under its lock. v0.1 (TTM, on AMLWorld HI-Small and TabFormer) found no detectable gain. v0.2, pre-registered on fresh data (AMLWorld LI-Small), found a modest, significant gain from one of its two variants (Chronos-Bolt-tiny: +3.2 points, Holm p 0.016) and none from the other. Results are below and in [`docs/findings.md`](docs/findings.md).
 
 ## The problem in one paragraph
 
@@ -148,9 +148,25 @@ Descriptive only (not pre-registered tests): on AMLWorld, D was ahead at the tig
 
 Runs: `20261116T190641Z_amlworld_test_f6ff26be_ac67fd` and `20261117T045139Z_tabformer_test_701e5f22_2e74f8`. Full tables: `uv run tells report artifacts/runs/<run>`.
 
-## Version 2 (pre-registered, in progress)
+## Version 2: pre-registered, fresh data, sealed
 
-Both v0.1 test periods are now used, so trying new models on them would be fishing. Diagnosing v0.1 suggested two specific reasons the TSFM signal may have been watered down: averaging a history that, for short AMLWorld accounts, is mostly padding, and relying on one pretrained model. v0.2 tests exactly two variants fixed in advance: `ttm_recent` (TTM summary from the most recent patch, 64 PCA components instead of 16) and `chronos_bolt` (Chronos-Bolt-tiny, from the family of the Chronos-2 model the AMLWorld paper used, built differently from TTM). MOMENT-1 was the first choice for the second variant, but it measured 143 ms per account-day on CPU, about 190 CPU hours for v0.2's data, so before any result it was dropped and the replacement was picked by a rule written first (the cheapest different-family model under 10 ms per account-day). The sealed test is a fresh dataset no model has touched, AMLWorld LI-Small (truncated at 2022-09-11, config `configs/amlworld_li_v2.yaml`), with the same split, contestants, and headline as v0.1 (first-fraud-day catch at 0.5%, Holm-corrected). Development stays on already-used HI-Small data (its 20,000-account sample), and the plan is locked and committed before any model runs on LI-Small. A second negative result will be reported the same way as a win. No v0.2 result exists yet. Plan: [`docs/v2-plan.md`](docs/v2-plan.md).
+**On a fresh sealed test, adding Chronos-Bolt-tiny summaries to the bank-style model caught 3.2 points more newly bad accounts on their first bad day at the pre-registered 0.5% budget (24.0% against 20.7%, 95% interval +1.1 to +5.4, Holm p 0.016). The other variant, TTM with recent pooling, gave no detectable gain (+0.8, interval -1.2 to +2.8).** That meets the win rule written before sealing (`docs/v2-plan.md` section 6): Holm p below 0.05, interval above zero, canary and control passing.
+
+Why v0.2 exists: both v0.1 test periods were used, so trying new models on them would be fishing. Diagnosing v0.1 (`docs/analysis/why-no-gain.md`) suggested two fixes, fixed in advance: `ttm_recent` (TTM summary of the most recent patch, 64 PCA components instead of 16) and a second pretrained model. MOMENT-1 was the first choice but measured 143 ms per account-day on CPU (about 190 CPU hours), so before any result it was replaced by a rule written first (the cheapest different-family model under 10 ms per account-day): Chronos-Bolt-tiny. The test is AMLWorld LI-Small, which no model had touched, with the same split, contestants, and headline as v0.1. The plan was sealed by hash and committed (lock `cf534a03`, commit `b8a1927`) before any LI-Small score, and the test was scored once.
+
+| AMLWorld LI-Small, 2022-09-08 to 2022-09-10, first-fraud-day catch at 0.5% | Catch | Difference vs B [95% interval] | Holm p |
+|---|---|---|---|
+| Newly bad accounts | 1,549 | | |
+| A. Lazy baseline | 1.2% | -19.5 [-21.5, -17.3] | 0.010 |
+| B. Checklist + LightGBM | 20.7% | reference | |
+| C. TTM recent only | 3.7% | -17.0 [-19.0, -14.8] | 0.010 |
+| D. B + TTM recent | 21.6% | +0.8 [-1.2, +2.8] | 0.42 |
+| C. Chronos-Bolt only | 2.8% | -17.9 [-20.0, -15.7] | 0.010 |
+| **D. B + Chronos-Bolt** | **24.0%** | **+3.2 [+1.1, +5.4]** | **0.016** |
+
+Canary passed; the bank-style model retrained on shuffled labels scored like random ranking (+0.0 points, -0.3 to +0.4). Holm corrects across the five comparisons; across all four "B + TSFM" sealed tests in the project, a Bonferroni bound on the raw p (0.008) is 0.032, still below 0.05.
+
+**How to read it, with caveats:** the gain is modest (about 50 more of 1,549 newly bad accounts at the same review budget), on one synthetic dataset, and specific to Chronos-Bolt, not any TSFM. The LI-Small validation day pointed the other way (-2.1, interval -5.9 to +1.4, 580 accounts); the sealed test is three days with 1,549 accounts and is the pre-registered number. Descriptively, D was ahead at tight budgets and behind at loose ones (68.7% against 73.5% at 5%), the same pattern as v0.1 on AMLWorld, and ahead in both history groups (short 26.2% against 23.5%; long 21.6% against 17.7%). Run: `20261117T235515Z_amlworld_li_v2_test_cf534a03_0f604f`. Plan: [`docs/v2-plan.md`](docs/v2-plan.md).
 
 ## Validation results (before sealing)
 
@@ -248,3 +264,4 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | 5. Controls, explainability, cost | 18 to 20 | Done |
 | 6. Agent harness | 21 to 25 | Built; live runs need an API key |
 | 7. Seal, test, findings, write-up | 26 to 30 | Both sealed tests done; findings written |
+| v0.2. Pre-registered follow-up on fresh data | | Done: sealed LI-Small test scored once; Chronos-Bolt variant +3.2 points (Holm p 0.016), TTM recent no gain |

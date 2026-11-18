@@ -2,9 +2,11 @@
 
 Written per `PROMPT.md` section 6. Every number is copied from a run file and tagged with its run id and config hash. Negative results are included. No causal claims beyond what the experiments support.
 
-Status: both sealed tests are final, each scored once under its lock: AMLWorld (Section 3) and TabFormer (Section 9).
+Status: all three sealed tests are final, each scored once under its lock: v0.1 AMLWorld HI-Small (Section 3) and TabFormer (Section 9), and v0.2 AMLWorld LI-Small (Section 10).
 
-**Overall conclusion:** adding TTM summaries of account histories to the bank-style model gave no detectable gain at the pre-registered budget on either sealed test: AMLWorld +0.1 points [-1.6, +1.9] at 0.5%, TabFormer +2.0 points [-0.6, +5.0] at 0.1%. Neither interval excludes zero. Both estimates point the same way and small gains are not ruled out, but this project cannot show them.
+**Overall conclusion:** adding TTM summaries of account histories to the bank-style model gave no detectable gain at the pre-registered budget on either sealed test: AMLWorld +0.1 points [-1.6, +1.9] at 0.5%, TabFormer +2.0 points [-0.6, +5.0] at 0.1%. Neither interval excludes zero. Both estimates point the same way and small gains are not ruled out, but v0.1 cannot show them.
+
+**v0.2 conclusion (pre-registered, fresh data):** on AMLWorld LI-Small, adding Chronos-Bolt-tiny summaries gave a modest, statistically significant gain: +3.2 points [+1.1, +5.4], Holm p 0.016, 24.0% against 20.7% of 1,549 newly bad accounts caught on their first day at 0.5%. TTM with recent pooling gave no detectable gain (+0.8 [-1.2, +2.8]). So the v0.1 negative was partly about the model: one different pretrained model added signal, the reworked TTM did not. Caveats in Section 10.
 
 ## 1. Question
 
@@ -76,7 +78,7 @@ On the TabFormer sealed test, D was ahead of B at every budget (Section 9), but 
 
 ## 8. Next steps
 
-1. A pre-registered follow-up on fresh data: this became Tells v0.2 (`docs/v2-plan.md`), testing two variants on untouched AMLWorld LI-Small: `ttm_recent` (recent pooling with more components, for the dilution idea) and `chronos_bolt` (Chronos-Bolt-tiny, a different pretrained model from the family the AMLWorld paper used). MOMENT was planned as the second variant but dropped before any result because it would need about 190 CPU hours (`docs/v2-plan.md`, "Changes before sealing"). It keeps the 0.5% headline on purpose: moving the headline to the budget where a descriptive hint appeared (0.1%) would be choosing the metric after seeing results.
+1. Done: a pre-registered follow-up on fresh data, Tells v0.2 (result in Section 10) (`docs/v2-plan.md`), testing two variants on untouched AMLWorld LI-Small: `ttm_recent` (recent pooling with more components, for the dilution idea) and `chronos_bolt` (Chronos-Bolt-tiny, a different pretrained model from the family the AMLWorld paper used). MOMENT was planned as the second variant but dropped before any result because it would need about 190 CPU hours (`docs/v2-plan.md`, "Changes before sealing"). It keeps the 0.5% headline on purpose: moving the headline to the budget where a descriptive hint appeared (0.1%) would be choosing the metric after seeing results.
 2. Run Chronos-2 on full data with a GPU.
 3. Try a rolling retrain: on AMLWorld so training includes established accounts, and on TabFormer, where the bank-style model went stale over the multi-year test period (Section 6).
 4. Replicate on real transaction data under a data-sharing agreement.
@@ -112,3 +114,36 @@ Run `20261116T193405Z_tabformer_valid_701e5f22_d9a420`, same config hash. Valida
 The label-permutation control on this run was not consistent with chance (Section 5). Outcome of the follow-up control: not a leak; shuffling across all days cut the excess to +0.9 to +1.5 points at 0.1%, and the remainder is explained by label-free effects (Section 5, methodology M42).
 
 The prediction stated before testing (any TSFM gain should be larger on AMLWorld than on TabFormer) cannot be judged: neither sealed test showed a clear gain.
+
+## 10. Version 2: AMLWorld LI-Small, sealed test (pre-registered)
+
+Run `20261117T235515Z_amlworld_li_v2_test_cf534a03_0f604f`, config hash `cf534a03d8c1`, test run number 1 under the lock committed in `b8a1927` (both the "started" and "finished" records are in `locks/cf534a03...uses.jsonl`). Test period 2022-09-08 to 2022-09-10; 1,549 newly bad accounts (803 with under 16 earlier events, 746 with 16 or more); 982,049 account-day cases. Plan: `docs/v2-plan.md`. Five comparisons, Holm-corrected.
+
+| Contestant | First-fraud-day catch at 0.5% | Difference vs B [95% interval] | Holm p |
+|---|---|---|---|
+| A. Lazy baseline | 1.2% | -19.5 [-21.5, -17.3] | 0.010 |
+| B. Checklist + LightGBM | 20.7% | reference | |
+| C. TTM recent only | 3.7% | -17.0 [-19.0, -14.8] | 0.010 |
+| D. B + TTM recent | 21.6% | +0.8 [-1.2, +2.8] | 0.42 |
+| C. Chronos-Bolt only | 2.8% | -17.9 [-20.0, -15.7] | 0.010 |
+| **D. B + Chronos-Bolt** | **24.0%** | **+3.2 [+1.1, +5.4]** | **0.016** |
+
+**Finding:** D with Chronos-Bolt-tiny meets the pre-registered win rule (Holm p below 0.05, interval above zero, canary and control passing). D with TTM recent pooling does not. Canary passed; label-permutation control +0.0 points [-0.3, +0.4], consistent with chance. Across all four "B + TSFM" sealed tests in the project (v0.1 AMLWorld and TabFormer, v0.2 two variants), a Bonferroni bound on the raw p of 0.008 gives 0.032.
+
+**Descriptive (not pre-registered):**
+- By budget, D Chronos-Bolt against B: 6.3% against 6.1% at 0.1%, 37.4% against 36.6% at 1%, 50.7% against 52.9% at 2%, 68.7% against 73.5% at 5%. Ahead at tight budgets, behind at loose ones, as in v0.1 on AMLWorld.
+- By history at 0.5%: short 26.2% against 23.5%, long 21.6% against 17.7%.
+- Transaction PR-AUC 0.0760 against 0.0733; case PR-AUC 0.0767 against 0.0778.
+- The TSFM columns carry 40% (Chronos-Bolt) and 38% (TTM recent) of D's SHAP attribution.
+- History mix: 9.3% of training account-days have 16 or more earlier events, 62.8% of test account-days.
+
+**Validation, for context:** on the LI-Small validation day (580 newly bad accounts, scored after sealing), D Chronos-Bolt was -2.1 [-5.9, +1.4] and D TTM recent -3.8 [-7.4, -0.2], neither significant after Holm. The validation day pointed the other way. It is a third the size of the test, and the plan fixed the test as the number that counts before either was scored.
+
+**Limits of this finding:**
+- One synthetic dataset. AMLWorld is simulated, so this does not show real-bank performance.
+- The effect is modest, about 50 more accounts out of 1,549 at the same budget.
+- It is specific to Chronos-Bolt. The reworked TTM did not help, so this is not "TSFMs help".
+- Validation disagreed in direction.
+- At loose budgets D was behind (descriptive).
+- Why Chronos-Bolt helps where TTM did not is not tested. It forecasts with quantiles and reads each channel separately; both are candidate reasons, not shown ones.
+

@@ -16,7 +16,7 @@ Say this in about 30 seconds, then let them pick what to dig into.
 
 - **Question:** "Banks can only review a tiny share of cases each day. I tested whether a pretrained time series foundation model, which summarizes each account's history, helps the tree model a bank already runs catch fraud on the first day an account goes bad."
 - **Method:** "I added the foundation model's summary as extra columns to a bank-style LightGBM model and compared it with the same model without them, on a synthetic money-laundering dataset and a synthetic card-fraud dataset, at a fixed daily review budget."
-- **Honest result:** "On my validation data it looked like a win, but on two sealed test periods, scored once each, it added no detectable gain at the budgets I had committed to in advance."
+- **Honest result:** "In version 1, IBM's TTM looked like a win on validation but added no detectable gain on two sealed test periods. I diagnosed why, pre-registered two fixes, and tested them on fresh data: one, Amazon's Chronos-Bolt, caught about 3 points more newly bad accounts at the same review budget, statistically significant after correction; the other did not help."
 - **Why you can trust it:** "The test plan was hashed and committed before any test score existed, every run plants a fake leak that must be caught, a model trained on shuffled labels serves as a placebo, and the gaps an independent code review found were fixed and merged without touching the sealed runs."
 
 ---
@@ -363,6 +363,24 @@ The full plan is in `docs/v2-plan.md`. It was written and fixed on 2026-11-17, b
 
 ---
 
+### Step 33. The v0.2 result: a modest, pre-registered win for one variant
+
+- **What I did:** scored the sealed LI-Small test once, after committing the lock (`b8a1927`). Run `20261117T235515Z_amlworld_li_v2_test_cf534a03_0f604f`.
+- **What happened:** B plus Chronos-Bolt-tiny caught 24.0% of the 1,549 newly bad accounts on their first bad day at the 0.5% budget, against 20.7% for B: +3.2 points, 95% interval +1.1 to +5.4, Holm p 0.016. B plus TTM recent caught 21.6%: +0.8, interval -1.2 to +2.8, no detectable gain. The canary passed and the shuffled-label control scored like random. This meets the win rule I wrote in Step 31.
+- **What it does and does not mean:**
+  - **It does mean:** on fresh data that no choice touched, one pretrained model added real signal to the bank-style model at a tight review budget.
+  - **It does not mean** that "TSFMs help". The reworked TTM did not.
+  - **It does not show real-bank performance.** The data is synthetic.
+  - **It does not say why** Chronos-Bolt helps. It forecasts with quantiles and summarizes each channel separately, but neither was tested as the reason.
+- **The part to be upfront about:**
+  - **Validation pointed the other way.** On the validation day it was -2.1 points, interval -5.9 to +1.4. That day has 580 accounts against 1,549 in the test, and the plan named the test as the number that counts before either was scored.
+  - **Behind at loose budgets.** D was behind at 2% and 5% (descriptive), the same trade-off as v0.1.
+  - **Four sealed tests in all.** Correcting for every "B + TSFM" test the project ever sealed, four in total, the result still holds (Bonferroni 0.032).
+- **Cause and effect:** v0.1's negative was partly about the model, not the idea. That is exactly what the second variant was there to check.
+- **How to say it:** "My first model gave a clean negative. I diagnosed it, wrote down two fixes and a win rule before touching new data, and one fix, a different pretrained model, gave a 3-point gain that survives correction. I'm careful to say it's one model on one synthetic dataset, and that the validation day pointed the other way."
+
+---
+
 ## Part 9. Every tool and framework, and why
 
 | Tool | What it does here | Why this one |
@@ -387,6 +405,10 @@ The full plan is in `docs/v2-plan.md`. It was written and fixed on 2026-11-17, b
 
 ## Part 10. Hard questions and honest answers
 
+**"So did the foundation model help or not?"** Version 1, no: IBM's TTM gave no detectable gain on two sealed tests. Version 2, yes for one model: on a fresh sealed test, Amazon's Chronos-Bolt added 3.2 points (interval +1.1 to +5.4, Holm p 0.016), while the reworked TTM gave nothing detectable. One-sentence version: "One pretrained model helped modestly on fresh data under rules written in advance; the other did not, so the answer depends on the model."
+
+**"Your v0.2 validation day said the opposite. Why believe the test?"** Because the plan said in advance that the test decides, and the test is bigger: three days and 1,549 newly bad accounts, against one day and 580. I report both. If I had used validation to choose, I would have dropped Chronos-Bolt and missed the result the larger sample supports. That said, the disagreement is a reason to replicate before relying on it.
+
 **"Isn't this all synthetic data?"** Yes, from two IBM generators. Real transaction data is private. I measured each dataset before using it, removed an artifact, and say everywhere that results do not show real-bank performance.
 
 **"Your validation gain came after you changed something. Isn't that p-hacking?"** It was the second variant tried, chosen after the first; I recorded both, counted them, and sealed the plan before scoring the test period, which is the number that counts.
@@ -395,7 +417,7 @@ The full plan is in `docs/v2-plan.md`. It was written and fixed on 2026-11-17, b
 
 **"Why didn't you run the big model on everything?"** No GPU. I measured it at about 125 ms per account-day on CPU; full data would take days. I ran it on a sample and labeled that.
 
-**"So the project failed?"** No. The question was whether a TSFM adds value at a fixed review budget, under an evaluation that cannot be gamed. The answer, for TTM on both sealed tests, is "not detectably": +0.1 points on AMLWorld (interval -1.6 to +1.9) and +2.0 points on TabFormer (interval -0.6 to +5.0). A clean negative result from a rigorous setup is more useful to a fraud team than an unverified positive one, and the hints (D ahead at the tightest AMLWorld budget, ahead at every TabFormer budget) say where a new sealed test should look.
+**"So the project failed?"** No. The question was whether a TSFM adds value at a fixed review budget, under an evaluation that cannot be gamed. v0.2 then found a modest gain for Chronos-Bolt on fresh data. The answer, for TTM on both v0.1 sealed tests, is "not detectably": +0.1 points on AMLWorld (interval -1.6 to +1.9) and +2.0 points on TabFormer (interval -0.6 to +5.0). A clean negative result from a rigorous setup is more useful to a fraud team than an unverified positive one, and the hints (D ahead at the tightest AMLWorld budget, ahead at every TabFormer budget) say where a new sealed test should look.
 
 **"How do you know there is no leakage?"** Features are proven past-only by replay; every run plants two cheats that must be caught; a model trained on shuffled labels must score like random, and did on every run except TabFormer validation (next question); the test plan is sealed by hash before scoring.
 
