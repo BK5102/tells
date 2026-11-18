@@ -1,5 +1,7 @@
 # Tells
 
+[![ci](https://github.com/BK5102/tells/actions/workflows/ci.yml/badge.svg)](https://github.com/BK5102/tells/actions/workflows/ci.yml)
+
 **Does a pretrained time series model help catch fraud and money laundering when analysts can only review a small, fixed number of cases each day?** Tells answers that with an evaluation built to catch cheating, and every choice in it is written down with its reason and its limits.
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.

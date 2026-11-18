@@ -2,7 +2,7 @@
 
 A small, domain-neutral toolkit for honest evaluation of models on time-ordered data. It is built inside the [Tells](https://github.com/BK5102/tells) repo and shared with the sibling projects Reserve and Culprit.
 
-Install a tagged release from another project (0.2.0 is tagged `cleanroom-v0.2`; until that tag exists, use `cleanroom-v0.1`, which lacks the 0.2 modules):
+Install a tagged release from another project (0.2.0 is tagged `cleanroom-v0.2`; `cleanroom-v0.1` is the earlier release without the 0.2 modules):
 
 ```
 uv add "cleanroom @ git+https://github.com/BK5102/tells@cleanroom-v0.2#subdirectory=packages/cleanroom"
