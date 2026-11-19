@@ -145,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         from tells.harness import run_experiment
 
         result = run_experiment(load_config(args.config), part=args.part)
-        print(json.dumps(result.summary, indent=2))
+        print(json.dumps(result.summary, indent=2, default=str))
         print(f"saved to {result.run_dir}")
         return 0
     if args.version:
