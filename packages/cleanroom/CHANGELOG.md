@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (2026-11-17, to be tagged `cleanroom-v0.2`)
+## 0.2.0 (2026-11-17, tag `cleanroom-v0.2`)
 
 New pieces for the sibling projects (forecasting curves, and detecting then explaining faults in time series). Nothing existing was removed or changed in a breaking way; code written for 0.1 runs unchanged.
 

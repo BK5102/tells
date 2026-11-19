@@ -30,6 +30,6 @@ The `diagrams/` folder has the same diagrams as images. The diagrams inside each
 
 ## Honest limits
 
-- No results exist yet. Every bracketed number in the pitch scripts is a placeholder to fill with something you measure.
+- Tells has results (`tells/docs/findings.md`). Every bracketed number in a pitch script is still a placeholder to fill only with something you measured.
 - Dataset names, TSFM capabilities, and the SR 26-2 details come from web sources and must be verified at build time. The plans say where. Tells datasets were measured on 2026-11-10 (`tells/docs/data-fit.md`).
 - Culprit uses simulated data only. Say so every time you present it.

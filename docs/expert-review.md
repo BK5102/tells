@@ -36,7 +36,7 @@ An expert would raise a few further points that the project does not answer yet.
 
 **Why it matters.** This is the difference between "a foundation model helps" and "more history features help".
 
-**Status.** Not tested.
+**Status.** Not tested (limitation L29).
 
 **How it would be tested.** A pre-registered ablation on a new sealed test, with three versions:
 - D with hand-made history summaries of the same three channels;
@@ -49,7 +49,7 @@ An expert would raise a few further points that the project does not answer yet.
 
 **The question.** LI-Small is fresh in the sense that no model or choice touched it. But it comes from the same IBM simulator as HI-Small, with a lower laundering rate. So a Chronos-Bolt gain could reflect how that simulator builds laundering patterns, not how real laundering behaves.
 
-**Status.** Partly disclosed. L25 says "one synthetic dataset", and guide Step 30 says "same generator". This page states it plainly: v0.2 is a new draw from the same world, not a second world.
+**Status.** Partly disclosed. L25 says "one synthetic dataset", and guide Step 30 says "same generator". This page states it plainly, and L31 records it: v0.2 is a new draw from the same world, not a second world.
 
 **How to say it.** "The fresh test rules out tuning to the test. It does not rule out quirks of the simulator, because both datasets come from the same generator."
 
@@ -61,7 +61,7 @@ An expert would raise a few further points that the project does not answer yet.
 
 **Why it matters.** With these sources included, the interval would be wider. Whether +1.1 points, the low end, would stay above zero is unknown.
 
-**Status.** Not measured.
+**Status.** Not measured (limitation L30).
 
 **How it would be tested.** Retrain B and D over several seeds, report the spread, and add a resampling step that resamples days as well as accounts.
 
@@ -74,7 +74,7 @@ An expert would raise a few further points that the project does not answer yet.
 - it summarizes each channel separately;
 - its patches are shorter.
 
-**Status.** Not tested (L25 and the M49 caveats). The v0.1 diagnostics explain why TTM did not help, mainly that it is blind to the same day's transactions. They do not explain why Chronos-Bolt did.
+**Status.** Not tested (findings Section 10; L27 records that the gain is specific to Chronos-Bolt). The v0.1 diagnostics explain why TTM did not help, mainly that it is blind to the same day's transactions. They do not explain why Chronos-Bolt did.
 
 **How to say it.** "I know which model helped, not why. That would need an ablation that changes one property at a time."
 
