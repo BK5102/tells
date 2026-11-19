@@ -351,7 +351,7 @@ The honest list. Each item says what could be wrong and what was done about it.
 | L1 | Synthetic data only | Results do not show real-bank performance | Stated everywhere; two different generators |
 | L2 | Both datasets come from IBM generators | Generator quirks may drive results | Measured fit, found and removed the AMLWorld tail artifact; label-permutation control on every run (M37); a time-shuffled variant was deferred |
 | L3 | AMLWorld usable span is ten days | One-day gaps, one-day validation, short histories | Stated; intervals will be wide and are reported |
-| L4 | AMLWorld data from a mirror | Source not yet confirmed against Kaggle | Row counts match the paper; checksum comparison planned |
+| L4 | AMLWorld data from a mirror | Source not yet confirmed against Kaggle | Row counts match the paper; checksum comparison planned, one command in `docs/runbook.md` (`scripts/verify_checksums.py`) |
 | L5 | TabFormer fraud is easy for the checklist model | Ceiling effect hides gains at loose budgets | Tighter 0.1% budget; first-fraud-day headline; AMLWorld as main test |
 | L6 | 90-day and 1-day gaps are assumptions | Real label delays differ | Stated; gap is a config value |
 | L7 | No graph features in contestant B | B is weaker than the paper's best baselines on AMLWorld | Stated; money-movement features added so B is not a card-only model |

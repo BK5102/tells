@@ -40,7 +40,7 @@ tells/
     agent/       planner.py  runner.py  critic.py  reporter.py  tools.py
     cli.py
   tests/
-  scripts/       check_data_fit.py and download scripts
+  scripts/       check_data_fit.py  precompute_embeddings.py  verify_checksums.py  demo.sh  analysis scripts
   configs/       experiment YAML files
   docs/          tsfm-notes.md  decisions.md  data-fit.md
   data/          gitignored except README.md and checksums.sha256 (raw/ downloads, interim/ Parquet)
@@ -51,7 +51,7 @@ The Cleanroom (`packages/cleanroom`, imported as `cleanroom`) is shared with the
 
 ## Data and scoring unit
 
-Measured fit for every candidate dataset is in `docs/data-fit.md`. Main test: AMLWorld HI-Small, truncated to 2022-09-01 through 2022-09-10 (the data after that is about 60% laundering, a generator artifact), because the bank-style model is far from perfect there and the published TSFM paper used it. Secondary, long-history test: IBM TabFormer credit card transactions. Reasons: `docs/methodology.md` M4. No other datasets are used. Sparkov, IEEE-CIS, and PaySim were evaluated and set aside (see the ranking in `docs/data-fit.md`); do not add loaders for them.
+Measured fit for every candidate dataset is in `docs/data-fit.md`. Main test: AMLWorld HI-Small, truncated to 2022-09-01 through 2022-09-10 (the data after that is about 60% laundering, a generator artifact), because the bank-style model is far from perfect there and the published TSFM paper used it. Secondary, long-history test: IBM TabFormer credit card transactions. Reasons: `docs/methodology.md` M4. The v0.2 follow-up's sealed test uses AMLWorld LI-Small, a sister file from the same generator, truncated the same way (`docs/v2-plan.md`, methodology M48). No other datasets are used. Sparkov, IEEE-CIS, and PaySim were evaluated and set aside (see the ranking in `docs/data-fit.md`); do not add loaders for them.
 
 The review budget applies to account-day cases (one case per account per active day; score is the max transaction score that day; label is 1 if any transaction that day is positive), as a share of each day's cases: 0.1%, 0.5%, 1%, 2%, 5%. **Headline metric: first-fraud-day catch rate**, at a 0.5% daily budget on AMLWorld and 0.1% on TabFormer (near the ceiling at 0.5%), set in every config under `headline:`. All other metrics are always reported next to it. See `docs/methodology.md` M10 to M12.
 
@@ -59,18 +59,29 @@ The review budget applies to account-day cases (one case per account per active 
 
 ```
 uv sync --all-packages                    # install tells and cleanroom
+uv sync --all-packages --extra tsfm       # also the TSFM packages (CPU torch); every config with a TSFM contestant needs it
 uv run pytest -q                          # tests for tells and cleanroom
 uv run --with polars python scripts/check_data_fit.py tabformer data/raw/tabformer/card_transaction.v1.csv
 uv run tells prepare tabformer             # raw CSV -> data/interim/*.parquet (full + 300-card sample)
 uv run tells prepare amlworld              # raw CSV -> data/interim/*.parquet (full + 20,000-account sample)
+uv run tells prepare amlworld_li           # LI-Small, the v0.2 sealed test data (full + 20,000-account sample)
 uv run pytest -q -m data                  # tests that need the prepared data (skipped in CI)
 uv run ruff check . && uv run ruff format --check .
-uv run tells run configs/small.yaml       # 300-card experiment on the validation period, about 30 s
+uv run tells run configs/small.yaml       # 300-card experiment on the validation period, 7 to 10 min on a laptop CPU (cache filled)
 uv run tells run configs/tabformer.yaml   # full TabFormer, validation period (test period: sealed; scoring it again needs a new lock)
-uv run tells run configs/amlworld_small.yaml  # 20,000-account AMLWorld sample, seconds
+uv run tells run configs/amlworld_small.yaml  # 20,000-account AMLWorld sample (Chronos-2 embedding takes hours the first time)
 uv run tells run configs/amlworld.yaml    # full AMLWorld (the main test), validation period
-uv run tells agent "does a longer history window help?"
+uv run tells run configs/amlworld_small_v2_dev.yaml  # v0.2 pipeline check on the HI-Small sample (no tuning allowed)
+uv run tells run configs/amlworld_li_v2.yaml         # v0.2 on LI-Small, validation period
+uv run python scripts/precompute_embeddings.py configs/amlworld_li_v2.yaml chronos_bolt 0 2  # fill a TSFM cache, worker 0 of 2
+uv run python scripts/precompute_embeddings.py configs/amlworld_li_v2.yaml chronos_bolt 1 2  # worker 1 of 2, run alongside
+uv run tells report artifacts/runs/<run id>          # tables from the run files
+uv run python scripts/verify_checksums.py            # local data against data/checksums.sha256
+bash scripts/demo.sh                                 # short showcase for a terminal recording
+uv run tells agent "does a longer history window help?"   # needs --extra agent and ANTHROPIC_API_KEY
 ```
+
+Sealed and spent test periods (each scored once; scoring any of them again needs a new lock and is reported as exploratory): AMLWorld HI-Small 2022-09-08 to 2022-09-10 (lock `f6ff26be`, `configs/amlworld.yaml`), TabFormer 2017-04-01 to 2019-12-31 (lock `701e5f22`, `configs/tabformer.yaml`), AMLWorld LI-Small 2022-09-08 to 2022-09-10 (lock `cf534a03`, `configs/amlworld_li_v2.yaml`). Never edit those configs or anything in `locks/`. The owner's manual steps are in `docs/runbook.md`.
 
 If a command above does not exist yet, create it as part of the day's task and update this file.
 

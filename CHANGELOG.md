@@ -2,7 +2,14 @@
 
 All notable changes to Tells. The shared Cleanroom package has its own changelog in `packages/cleanroom/CHANGELOG.md`.
 
-## 0.2.0 (2026-11-17)
+## Unreleased
+
+- `docs/runbook.md`: the owner's three remaining manual steps (live agent run, Kaggle checksum comparison, terminal recording), one command each.
+- `scripts/verify_checksums.py`: compares local data, another copy (such as the official Kaggle file), or a pasted checksum with `data/checksums.sha256`.
+- `scripts/demo.sh`: a short showcase for a terminal recording.
+- Fixed: `tells run` crashed after saving a run when printing its summary, because YAML split dates are not JSON serializable. The run files were unaffected (the harness already wrote them with dates as text).
+
+## 0.2.0 (2026-11-17, tagged `v0.2`)
 
 A pre-registered follow-up on fresh data: `docs/v2-plan.md`.
 
@@ -101,7 +108,7 @@ The full register is in `docs/methodology.md` under "Limitations register". The 
 3. **AMLWorld training holds almost only new accounts** (L18). Account-days with 16 or more earlier events are 9.3% of training and 62.7% of the test period, so TSFM features are learned on new accounts and applied to established ones. No split choice removes this.
 4. **Chronos-2 ran only on a 20,000-account sample** (L15, L16). Full-data Chronos-2 needs a GPU, so the sealed test covers TTM only.
 5. **No graph features in contestant B** (L7). B is weaker than the best published AMLWorld baselines, though its money-movement red flags keep it from being a strawman.
-6. **The AMLWorld copy is a Hugging Face mirror** (L4). Its counts match the paper; the checksum comparison with the official Kaggle file is still to do.
+6. **The AMLWorld copy is a Hugging Face mirror** (L4). Its counts match the paper; the checksum comparison with the official Kaggle file is still to do (one command in `docs/runbook.md`).
 7. **The gaps are assumptions** (L6). 90 days for cards and 1 day for laundering stand in for label delay; real delays differ.
 8. **The lock does not block code edits** (L13). Git history is what makes any edit between sealing and scoring visible.
 9. **A label-permutation control failed on TabFormer validation.** The bank-style model trained on labels shuffled within each day caught 5.9% of newly bad cards against 0.1% for random ranking (+5.8 points [+4.0, +7.8]). The same control passed on the TabFormer sealed test. A follow-up that shuffles across all days (`docs/analysis/tabformer-shuffle-scope-control.md`, generated after the sealed runs) cut the excess at 0.1% to +1.5 [+0.6, +2.6] and +0.9 [+0.3, +1.6] (two seeds). That model holds no label information, so the remainder is not a leak: busier account-days get higher maximum scores even under noise, and a tree fitted to noise still flags unusual transactions. A constant score is too weak a stand-in for chance here (methodology M42, L24).

@@ -4,7 +4,7 @@ Written per `PROMPT.md` section 6. Every number is copied from a run file and ta
 
 Status: all three sealed tests are final, each scored once under its lock: v0.1 AMLWorld HI-Small (Section 3) and TabFormer (Section 9), and v0.2 AMLWorld LI-Small (Section 10).
 
-**Overall conclusion:** adding TTM summaries of account histories to the bank-style model gave no detectable gain at the pre-registered budget on either sealed test: AMLWorld +0.1 points [-1.6, +1.9] at 0.5%, TabFormer +2.0 points [-0.6, +5.0] at 0.1%. Neither interval excludes zero. Both estimates point the same way and small gains are not ruled out, but v0.1 cannot show them.
+**v0.1 conclusion:** adding TTM summaries of account histories to the bank-style model gave no detectable gain at the pre-registered budget on either sealed test: AMLWorld +0.1 points [-1.6, +1.9] at 0.5%, TabFormer +2.0 points [-0.6, +5.0] at 0.1%. Neither interval excludes zero. Both estimates point the same way and small gains are not ruled out, but v0.1 cannot show them.
 
 **v0.2 conclusion (pre-registered, fresh data):** on AMLWorld LI-Small, adding Chronos-Bolt-tiny summaries gave a modest, statistically significant gain: +3.2 points [+1.1, +5.4], Holm p 0.016, 24.0% against 20.7% of 1,549 newly bad accounts caught on their first day at 0.5%. TTM with recent pooling gave no detectable gain (+0.8 [-1.2, +2.8]). So the v0.1 negative was partly about the model: one different pretrained model added signal, the reworked TTM did not. Caveats in Section 10.
 
@@ -74,7 +74,7 @@ On the TabFormer sealed test, D was ahead of B at every budget (Section 9), but 
 - **Real bank data:** private. All results are on synthetic data from two IBM generators.
 - **A training window with established accounts on AMLWorld:** the dataset starts on Sept 1, so training holds almost only new accounts (9.3% with 16 or more earlier events against 62.7% in the test period). No split choice removes this (M41).
 - **Graph-based baselines:** out of scope; the bank-style model has money-movement red flags but no transaction-network features.
-- **The agent on live Claude:** built and tested with a hand-written cassette; a live run needs an API key.
+- **The agent on live Claude:** built and tested with a hand-written cassette; a live run needs an API key (command in `docs/runbook.md`).
 
 ## 8. Next steps
 

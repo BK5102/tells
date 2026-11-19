@@ -6,7 +6,11 @@
 
 In poker, a "tell" is a small behavior that gives away a hidden hand. A stolen card or a mule account gives off tells too: odd timing, odd amounts, a sudden change in rhythm. Tells tests whether a time series foundation model (TSFM), a model pretrained on millions of time series, can read those tells from an account's history and add value on top of the checklist-plus-tree-model approach banks use today.
 
-> **Status (2026-11-17): complete.** The honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`, extended for the sibling projects in `cleanroom-v0.2`), the contestants, the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (214 tests). Three sealed tests are done, each scored once under its lock. v0.1 (TTM, on AMLWorld HI-Small and TabFormer) found no detectable gain. v0.2, pre-registered on fresh data (AMLWorld LI-Small), found a modest, significant gain from one of its two variants (Chronos-Bolt-tiny: +3.2 points, Holm p 0.016) and none from the other. Results are below and in [`docs/findings.md`](docs/findings.md).
+> **Status (2026-11-18): complete.** The honest-exam toolkit (the Cleanroom, released as `cleanroom-v0.1`, extended for the sibling projects in `cleanroom-v0.2`), the contestants, the label-permutation control, SHAP explanations, the report generator, and the agent's tools, loop, and critic are built and tested (292 tests). Three sealed tests are done, each scored once under its lock; releases are tagged `v0.1` and `v0.2`. The owner's remaining manual steps (a live agent run, the Kaggle checksum comparison, a terminal recording) each have one command in [`docs/runbook.md`](docs/runbook.md).
+
+## Results at a glance
+
+**v0.1:** adding IBM's TTM summaries of each account's history to the bank-style model gave no detectable gain on either sealed test (AMLWorld HI-Small +0.1 points [-1.6, +1.9]; TabFormer +2.0 [-0.6, +5.0]). **v0.2**, pre-registered on fresh data (AMLWorld LI-Small): adding Chronos-Bolt-tiny caught 3.2 points more newly bad accounts on their first bad day at the same review budget (24.0% against 20.7%, [+1.1, +5.4], Holm p 0.016), while TTM with recent pooling gave no detectable gain (+0.8 [-1.2, +2.8]). It is one model on one synthetic dataset; the caveats are below and in [`docs/findings.md`](docs/findings.md).
 
 ## The problem in one paragraph
 
@@ -220,18 +224,20 @@ The short list. The full register, with what was done about each, is in [`docs/m
 - AMLWorld has ten usable days, so gaps are one day and validation is a single day; intervals will be wide.
 - The gaps (90 days for cards, 1 day for laundering) are assumptions about label delay.
 - Contestant B has no graph features, so it is weaker than the best published AMLWorld models. It does have money-movement red flags, so it is a fair baseline, not a strawman.
-- The AMLWorld copy is a mirror whose counts match the paper; the comparison with the official Kaggle checksum is still to do.
+- The AMLWorld copy is a mirror whose counts match the paper; the comparison with the official Kaggle checksum is still to do (one command, in [`docs/runbook.md`](docs/runbook.md)).
 - This is not a production system. The agent planned for later runs experiments and drafts reports; it never decides who is fraudulent.
 
 ## Quickstart
 
 ```
-uv sync --all-packages
+uv sync --all-packages --extra tsfm                # tells, cleanroom, and the TSFM packages (CPU)
 uv run pytest -q                                   # all tests; data and model tests skip without them
 uv run tells prepare tabformer                     # after downloading (see data/README.md)
-uv run tells prepare amlworld
-uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, about 15 seconds
+uv run tells run configs/small.yaml                # 300-card TabFormer sample, validation year 2016
+uv run tells report artifacts/runs/<run id>        # the tables, built from the run files
 ```
+
+On a laptop CPU the small run took 7 to 10 minutes with the TTM embedding cache already filled (measured 2026-11-18); the first run also embeds 528,780 account-days with TTM. `bash scripts/demo.sh` shows tests, a run's report, and the sealed v0.2 headline in about two minutes. Every config with a TSFM contestant needs the `tsfm` extra; without it `tells run` stops at `import torch`. `uv run tells prepare amlworld` and `uv run tells run configs/amlworld_small.yaml` run the 20,000-account AMLWorld sample, where Chronos-2 embedding takes hours on a CPU the first time.
 
 `uv run tells run configs/amlworld.yaml` runs the full main test on the validation period. Scoring the test period needs `uv run tells lock <config>` first.
 
@@ -241,6 +247,7 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 |---|---|
 | [`docs/explain-the-project.md`](docs/explain-the-project.md) | **The project as a story: every step, why, what it caused, and how to explain it in an interview.** Read this first |
 | [`docs/findings.md`](docs/findings.md) | Findings and limits: what worked, what did not, what could not be tested, next steps |
+| [`docs/runbook.md`](docs/runbook.md) | The owner's remaining manual steps, one command each: live agent run, Kaggle checksum comparison, terminal recording |
 | [`docs/v2-plan.md`](docs/v2-plan.md) | Pre-registered plan for v0.2: two variants, fresh sealed test on AMLWorld LI-Small, success rule fixed in advance |
 | [`docs/methodology.md`](docs/methodology.md) | **Every choice: what, why, what else was considered, limitation.** Start here to understand the project |
 | [`docs/decisions.md`](docs/decisions.md) | Dated diary of what was built and why, in plain English with analogies |
@@ -264,6 +271,6 @@ uv run tells run configs/amlworld_small.yaml       # 20,000-account sample, abou
 | 3. Lock, luck checks, canary, Cleanroom v0.1 | 9 to 11 | Done |
 | 4. TSFM contestants | 12 to 17 | Done (validation) |
 | 5. Controls, explainability, cost | 18 to 20 | Done |
-| 6. Agent harness | 21 to 25 | Built; live runs need an API key |
+| 6. Agent harness | 21 to 25 | Built; a live run needs an API key (`docs/runbook.md`) |
 | 7. Seal, test, findings, write-up | 26 to 30 | Both sealed tests done; findings written |
 | v0.2. Pre-registered follow-up on fresh data | | Done: sealed LI-Small test scored once; Chronos-Bolt variant +3.2 points (Holm p 0.016), TTM recent no gain |

@@ -2,7 +2,7 @@
 
 **Status: drafts, not posted.** Three proposed GitHub issues for outside contributors, taken from the next steps in `docs/findings.md` and the limitations register in `docs/methodology.md`. Each should be opened only after the owner reviews it.
 
-Ground rules for every issue: read `CLAUDE.md` first. Splits go through `cleanroom.split`, numbers come from run files, any new choice gets a `docs/methodology.md` entry, and negative results stay on record. The AMLWorld test period has already been scored once under a sealed plan, so no issue below may score it again without a new lock, and any such run must be counted and reported as exploratory.
+Ground rules for every issue: read `CLAUDE.md` first. Splits go through `cleanroom.split`, numbers come from run files, any new choice gets a `docs/methodology.md` entry, and negative results stay on record. All three sealed test periods (AMLWorld HI-Small, TabFormer, AMLWorld LI-Small) have already been scored once under sealed plans, so no issue below may score one again without a new lock, and any such run must be counted and reported as exploratory.
 
 ---
 
@@ -17,7 +17,7 @@ Ground rules for every issue: read `CLAUDE.md` first. Splits go through `cleanro
 - If the checksums differ, a short note reports whether row count, account count, laundering count, and date range still match, measured with `scripts/check_data_fit.py`, and whether the difference is only formatting (line endings, column order).
 - `docs/methodology.md` M8 and L4 are updated to say what was found. No result is rerun as part of this issue.
 
-**Pointers.** `data/README.md`, `data/checksums.sha256`, `src/tells/data/amlworld.py`, `scripts/check_data_fit.py`, `docs/methodology.md` (M8, L4), `docs/data-fit.md`.
+**Pointers.** `docs/runbook.md` (step 2), `scripts/verify_checksums.py`, `data/README.md`, `data/checksums.sha256`, `src/tells/data/amlworld.py`, `scripts/check_data_fit.py`, `docs/methodology.md` (M8, L4), `docs/data-fit.md`.
 
 ---
 
