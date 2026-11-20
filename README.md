@@ -274,3 +274,7 @@ On a laptop CPU the small run took 7 to 10 minutes with the TTM embedding cache 
 | 6. Agent harness | 21 to 25 | Built; a live run needs an API key (`docs/runbook.md`) |
 | 7. Seal, test, findings, write-up | 26 to 30 | Both sealed tests done; findings written |
 | v0.2. Pre-registered follow-up on fresh data | | Done: sealed LI-Small test scored once; Chronos-Bolt variant +3.2 points (Holm p 0.016), TTM recent no gain |
+
+## License
+
+MIT, see [LICENSE](LICENSE). It covers the code and documents in this repo. Datasets are not included and keep their own terms.
